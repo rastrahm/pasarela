@@ -187,7 +187,7 @@ Libera un hold cuando el settlement falla en el Gateway.
 
 ## Fixtures de contrato
 
-Ejemplos JSON en `tests/fixtures/` — validados por `tests/api_contract.rs`:
+Ejemplos JSON en `crates/oracle-client/tests/fixtures/` — validados por `crates/oracle-client/tests/api_contract.rs` y `oracle/tests/gateway_contract.rs`:
 
 - `authorize_request.json`
 - `authorize_response.json`

@@ -1,3 +1,9 @@
+# Workspace Pasarela Multi-Rail
+#
+# Reglas de dependencia — ver Doc/Arquitectura.md §4:
+#   oracle/  → oracle-client (contrato wire); NO domain/rail-switcher
+#   domain/  → sin infra; rail-switcher → domain únicamente
+
 [workspace]
 resolver = "2"
 members = [
