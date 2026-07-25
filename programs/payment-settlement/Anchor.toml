@@ -1,0 +1,30 @@
+[toolchain]
+anchor_version = "0.31.1"
+package_manager = "npm"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+payment_settlement = "4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564B"
+
+[programs.devnet]
+payment_settlement = "4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564B"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "npm run test:only"
+
+[test]
+startup_wait = 5000
+shutdown_wait = 2000
+
+[test.validator]
+bind_address = "127.0.0.1"

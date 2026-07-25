@@ -12,8 +12,8 @@
 | **Objetivo** | Procesador de pagos con tarjeta y liquidación mutable en tres rieles (Banco, Binance CEX, Solana) |
 | **Enfoque** | Desarrollo secuencial por fases; confirmación explícita antes de avanzar |
 | **Unidades de despliegue** | `pasarela/` + `oracle/` + `antifraud/` (monorepo D5) |
-| **Fase actual** | **Fase 2 — Oracle** *(cerrada 2026-07-25)* |
-| **Próximo hito** | Fase 3 (Anchor) y/o Fase 4 (API Gateway) |
+| **Fase actual** | **Fase 3 — Solana/Anchor** *(3.10 documentación cerrada 2026-07-25)* |
+| **Próximo hito** | Gate Fase 3 (acta) + confirmación Fase 4 |
 
 ### Estado actual del repositorio
 
@@ -22,8 +22,8 @@
 | Documentación de arquitectura | ✅ Completada |
 | Casos de uso, ER y flujos | ✅ Completados |
 | Esqueleto `oracle/` | ✅ Completo (67 tests, persistencia, seguridad) |
-| Workspace `pasarela/` (crates, programs, frontend) | ✅ `domain`, `rail-switcher`, `oracle-client` |
-| CI/CD | ⬜ Pendiente |
+| Workspace `pasarela/` (crates, programs, frontend) | ✅ `domain`, `rail-switcher`, `oracle-client`; `programs/payment-settlement/` en devnet |
+| CI/CD | ⬜ Pendiente (Rust) · ✅ `programs-anchor-test` workflow |
 | Despliegue producción | ⬜ Pendiente |
 
 ---
@@ -224,16 +224,16 @@ Programa Anchor `payment-settlement` con instrucción `process_payment`, transfe
 
 | # | Paso | Detalle |
 |---|------|---------|
-| 3.1 | Inicializar proyecto Anchor en `programs/payment-settlement/` | `Anchor.toml`, estructura estándar |
-| 3.2 | Escribir tests TypeScript **antes** de la lógica | Casos borde obligatorios (§7.4 Arquitectura) |
-| 3.3 | Definir `SettlementState` PDA | Seeds: `["settlement", merchant.key()]` |
-| 3.4 | Implementar `process_payment` | Transfer SPL + actualizar contadores PDA |
-| 3.5 | Emitir evento `PaymentProcessed` | Sin PII |
-| 3.6 | Validaciones `#[derive(Accounts)]` explícitas | `signer`, `owner`, `seeds`, `bump`, mint |
-| 3.7 | Errores personalizados `#[error_code]` | Overflow, unauthorized, invalid mint |
-| 3.8 | Ejecutar `anchor test` en local validator | Suite verde |
-| 3.9 | Desplegar en devnet (opcional MVP) | Registrar program ID |
-| 3.10 | Documentar instrucciones con `@notice/@param/@return` | Por cada instrucción pública |
+| 3.1 | Inicializar proyecto Anchor en `programs/payment-settlement/` | ✅ `Anchor.toml`, estructura estándar, bootstrap `initialize`, 2 tests TS |
+| 3.2 | Escribir tests TypeScript **antes** de la lógica | ✅ 4 casos §7.4 + helpers SPL/PDA (ROJO hasta 3.4–3.6) |
+| 3.3 | Definir `SettlementState` PDA | ✅ Seeds `["settlement", merchant]`, init + 6 tests PDA |
+| 3.4 | Implementar `process_payment` | ✅ Transfer SPL + contadores PDA + evento |
+| 3.5 | Emitir evento `PaymentProcessed` | ✅ Sin PII (incluido en 3.4) |
+| 3.6 | Validaciones `#[derive(Accounts)]` explícitas | ✅ signer, owner, seeds, bump, mint, balance |
+| 3.7 | Errores personalizados `#[error_code]` | ✅ Unauthorized, InvalidMint, AmountOverflow, etc. |
+| 3.8 | Ejecutar `anchor test` en local validator | ✅ 17/17 verdes + workflow CI |
+| 3.9 | Desplegar en devnet (opcional MVP) | ✅ Program ID `4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564B` — ver `deploy/devnet.json` |
+| 3.10 | Documentar instrucciones con `@notice/@param/@return` | ✅ 5 instrucciones + gate `npm run lint:docs` |
 
 ### Entregables
 
@@ -241,15 +241,16 @@ Programa Anchor `payment-settlement` con instrucción `process_payment`, transfe
 programs/payment-settlement/
 ├── programs/payment-settlement/src/lib.rs
 ├── tests/payment-settlement.ts
-└── Anchor.toml
+├── Anchor.toml
+└── deploy/devnet.json
 ```
 
 ### Criterios de aceptación (gate)
 
-- [ ] `anchor test` verde (transferencia OK + casos de fallo)
-- [ ] Integer overflow rechazado
-- [ ] Firma no autorizada rechazada
-- [ ] Evento emitido sin PII
+- [x] `anchor test` verde (transferencia OK + casos de fallo) — 17 tests, validador local
+- [x] Integer overflow rechazado
+- [x] Firma no autorizada rechazada
+- [x] Evento emitido sin PII
 - [ ] Confirmación explícita para Fase 4
 
 ---
@@ -517,7 +518,7 @@ Según [Arquitectura §9.8](./Arquitectura.md#98-alcance-mvp-vs-producción):
 |---------|------|
 | PR / push | `oracle: cargo test && clippy` |
 | PR / push | `pasarela: cargo test && clippy` (cuando exista workspace) |
-| PR / push | `programs: anchor test` (cuando exista) |
+| PR / push | `programs: anchor test` | ✅ `.github/workflows/programs-anchor-test.yml` |
 | PR / push | `frontend: pnpm test && lint` (cuando exista) |
 | Pre-release | Playwright E2E contra stack local |
 
@@ -540,6 +541,7 @@ Según [Arquitectura §9.8](./Arquitectura.md#98-alcance-mvp-vs-producción):
 | Gateway | `ORACLE_API_KEY` | Misma clave que Oracle |
 | Gateway | `DATABASE_URL` | Persistencia transacciones |
 | Gateway | `SOLANA_RPC_URL` | RPC para riel Solana |
+| Gateway | `PAYMENT_SETTLEMENT_PROGRAM_ID` | Program ID Anchor (`4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564B` en devnet) |
 | Frontend | `VITE_API_BASE_URL` | URL pública del Gateway |
 
 ---
