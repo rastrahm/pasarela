@@ -1,9 +1,9 @@
 {
   "license": "ISC",
   "scripts": {
-    "build": "anchor build --no-idl -- --tools-version v1.52 && anchor idl build && anchor idl type -o target/types/payment_settlement.ts target/idl/payment_settlement.json",
+    "build": "anchor build --no-idl -- --tools-version v1.52 && anchor idl build -o target/idl/payment_settlement.json -t target/types/payment_settlement.ts",
     "test": "npm run build && anchor test --skip-build",
-    "test:only": "ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts",
+    "test:only": "ts-mocha -p ./tsconfig.json -t 1000000 tests/payment-settlement.ts tests/process-payment.ts",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
   },
@@ -16,6 +16,7 @@
     "@coral-xyz/anchor": "^0.31.1"
   },
   "devDependencies": {
+    "@solana/spl-token": "^0.4.13",
     "@types/bn.js": "^5.1.0",
     "@types/chai": "^4.3.0",
     "@types/mocha": "^9.0.0",

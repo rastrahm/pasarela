@@ -60,11 +60,24 @@ Program ID (local/devnet scaffold): `4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564
 
 | Paso | Entregable |
 |------|------------|
-| 3.2 | Tests TS de casos borde (TDD) |
-| 3.3 | PDA `SettlementState` — seeds `["settlement", merchant]` |
-| 3.4 | Instrucción `process_payment` |
+| 3.3 | PDA `SettlementState` — seeds `["settlement", merchant]` *(scaffold parcial en lib.rs)* |
+| 3.4 | Instrucción `process_payment` — hacer verde los 4 tests §7.4 |
 | 3.5 | Evento `PaymentProcessed` |
+| 3.6 | Constraints explícitos en `#[derive(Accounts)]` |
 | 3.8 | `anchor test` verde |
+
+### Estado TDD (3.2)
+
+Los tests en `tests/process-payment.ts` están escritos **antes** de la lógica. Hasta 3.4–3.6 fallan con `NotImplemented` o errores de constraint pendientes:
+
+| Test §7.4 | Error actual (esperado) |
+|-----------|------------------------|
+| Firma no autorizada | `NotImplemented` → `Unauthorized` (3.6) |
+| Espacio insuficiente | `NotImplemented` → `InsufficientAccountSpace` (3.6) |
+| Overflow aritmético | `NotImplemented` → `AmountOverflow` (3.4) |
+| Transferencia OK + evento | `NotImplemented` → éxito (3.4–3.5) |
+
+Bootstrap (3.1): 2 tests verdes. PDA seeds: 1 test verde.
 
 ## Seguridad
 
