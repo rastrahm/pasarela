@@ -5,13 +5,24 @@ use serde::{Deserialize, Serialize};
 use crate::error::AppError;
 
 /// Payload de tarjeta recibido del Gateway (datos ficticios de demo).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Clone, Deserialize, Serialize, PartialEq)]
 pub struct CardPayload {
     pub pan: String,
     pub expiry_month: String,
     pub expiry_year: String,
     pub cvv: String,
     pub cardholder: String,
+}
+
+impl std::fmt::Debug for CardPayload {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        crate::logging::RedactedCard {
+            expiry_month: &self.expiry_month,
+            expiry_year: &self.expiry_year,
+            last_four: None,
+        }
+        .fmt(f)
+    }
 }
 
 /// Resultado de validación sin exponer el PAN completo.
@@ -25,7 +36,17 @@ pub struct CardValidationResult {
 }
 
 /// Marcas de tarjeta soportadas.
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    sqlx::Type,
+)]
+#[sqlx(type_name = "card_brand", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum CardBrand {
     Visa,

@@ -20,11 +20,17 @@ pub enum AppError {
     #[error("demasiadas solicitudes")]
     TooManyRequests,
 
+    #[error("conflicto de estado: {0}")]
+    Conflict(String),
+
     #[error("tarjeta inválida")]
     InvalidCard,
 
     #[error("fondos insuficientes")]
     InsufficientFunds,
+
+    #[error("transacción rechazada por antifraude")]
+    FraudDeclined,
 
     #[error("riel no disponible")]
     RailUnavailable,
@@ -42,8 +48,10 @@ impl AppError {
             Self::Unauthorized => StatusCode::UNAUTHORIZED,
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
+            Self::Conflict(_) => StatusCode::CONFLICT,
             Self::InvalidCard => StatusCode::UNPROCESSABLE_ENTITY,
             Self::InsufficientFunds => StatusCode::PAYMENT_REQUIRED,
+            Self::FraudDeclined => StatusCode::PAYMENT_REQUIRED,
             Self::RailUnavailable => StatusCode::SERVICE_UNAVAILABLE,
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -55,8 +63,10 @@ impl AppError {
             Self::Unauthorized => "UNAUTHORIZED",
             Self::Forbidden => "FORBIDDEN",
             Self::TooManyRequests => "TOO_MANY_REQUESTS",
+            Self::Conflict(_) => "CONFLICT",
             Self::InvalidCard => "INVALID_CARD",
             Self::InsufficientFunds => "INSUFFICIENT_FUNDS",
+            Self::FraudDeclined => "FRAUD_DECLINED",
             Self::RailUnavailable => "RAIL_UNAVAILABLE",
             Self::NotFound => "NOT_FOUND",
             Self::Internal(_) => "INTERNAL_ERROR",

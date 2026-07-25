@@ -1,0 +1,316 @@
+openapi: 3.0.3
+info:
+  title: Oracle de Autorización — API interna v1
+  description: |
+    Contrato HTTP del microservicio Oracle (`oracle/`).
+    Solo el **API Gateway** consume estos endpoints vía red interna.
+
+    Flujo interno por request de autorización:
+    UC-11 (auth) → UC-03 (Luhn) → UC-12 (antifraude) → UC-04 (fondos + hold)
+  version: 1.0.0
+  contact:
+    name: Pasarela Multi-Rail
+
+servers:
+  - url: http://localhost:8081
+    description: Desarrollo local
+  - url: http://oracle:8081
+    description: Red Docker interna
+
+tags:
+  - name: public
+    description: Endpoints sin autenticación
+  - name: internal
+    description: Endpoints protegidos — solo Gateway
+
+paths:
+  /health:
+    get:
+      tags: [public]
+      summary: Healthcheck
+      operationId: getHealth
+      responses:
+        "200":
+          description: Servicio operativo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /internal/v1/authorize:
+    post:
+      tags: [internal]
+      summary: Autorizar tarjeta y crear hold
+      description: |
+        Valida tarjeta (Luhn), consulta antifraude, evalúa fondos del riel
+        y persiste un hold temporal. UC-03 + UC-12 + UC-04.
+      operationId: authorize
+      security:
+        - OracleApiKey: []
+      parameters:
+        - $ref: "#/components/parameters/XForwardedFor"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthorizeRequest"
+            example:
+              gateway_request_id: "550e8400-e29b-41d4-a716-446655440000"
+              card:
+                pan: "4111111111111111"
+                expiry_month: "12"
+                expiry_year: "30"
+                cvv: "123"
+                cardholder: "Demo User"
+              amount: 100.0
+              currency: "USD"
+              funding_type: traditional_bank
+      responses:
+        "200":
+          description: Hold creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthorizeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "402":
+          description: Fondos insuficientes o antifraude decline
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                insufficient:
+                  value:
+                    error_code: INSUFFICIENT_FUNDS
+                    message: fondos insuficientes
+                fraud:
+                  value:
+                    error_code: FRAUD_DECLINED
+                    message: transacción rechazada por antifraude
+        "422":
+          description: Tarjeta inválida (Luhn o marca)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "503":
+          description: Antifraude o riel no disponible (fail closed)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /internal/v1/hold/release:
+    post:
+      tags: [internal]
+      summary: Liberar hold
+      description: |
+        Libera un hold activo cuando el settlement del Gateway falla.
+        Idempotente para holds ya `released` o `expired`.
+      operationId: releaseHold
+      security:
+        - OracleApiKey: []
+      parameters:
+        - $ref: "#/components/parameters/XForwardedFor"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReleaseHoldRequest"
+      responses:
+        "200":
+          description: Hold liberado o ya estaba liberado/expirado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReleaseHoldResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Hold no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Hold ya consumido — no se puede liberar
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  securitySchemes:
+    OracleApiKey:
+      type: apiKey
+      in: header
+      name: X-API-KEY
+      description: Clave compartida con el Gateway (`ORACLE_API_KEY`)
+
+  parameters:
+    XForwardedFor:
+      name: X-Forwarded-For
+      in: header
+      required: false
+      description: IP del Gateway para allowlist y rate limiting
+      schema:
+        type: string
+        example: "127.0.0.1"
+
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: oracle-authorization
+
+    CardPayload:
+      type: object
+      required: [pan, expiry_month, expiry_year, cvv, cardholder]
+      properties:
+        pan:
+          type: string
+          description: PAN ficticio — nunca persistido (D6)
+        expiry_month:
+          type: string
+          example: "12"
+        expiry_year:
+          type: string
+          example: "30"
+        cvv:
+          type: string
+          description: CVV ficticio — nunca persistido
+        cardholder:
+          type: string
+
+    FundingType:
+      type: string
+      enum: [traditional_bank, binance_cex, solana_wallet]
+
+    AuthorizeRequest:
+      type: object
+      required: [gateway_request_id, card, amount, currency, funding_type]
+      properties:
+        gateway_request_id:
+          type: string
+          format: uuid
+          description: Correlación con transacción del Gateway
+        card:
+          $ref: "#/components/schemas/CardPayload"
+        amount:
+          type: number
+          format: double
+          minimum: 0
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: USD
+        funding_type:
+          $ref: "#/components/schemas/FundingType"
+
+    AuthorizeResponse:
+      type: object
+      required: [hold_id, brand, brand_code, last_four, gateway_request_id]
+      properties:
+        hold_id:
+          type: string
+          format: uuid
+        brand:
+          type: string
+          example: visa
+        brand_code:
+          type: integer
+          description: "1=Visa, 2=Mastercard, 3=Amex"
+        last_four:
+          type: string
+          example: "1111"
+        gateway_request_id:
+          type: string
+          format: uuid
+
+    ReleaseHoldRequest:
+      type: object
+      required: [hold_id]
+      properties:
+        hold_id:
+          type: string
+          format: uuid
+
+    ReleaseHoldResponse:
+      type: object
+      required: [hold_id, status]
+      properties:
+        hold_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, consumed, released, expired]
+
+    ErrorResponse:
+      type: object
+      required: [error_code, message]
+      properties:
+        error_code:
+          type: string
+          enum:
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - TOO_MANY_REQUESTS
+            - CONFLICT
+            - INVALID_CARD
+            - INSUFFICIENT_FUNDS
+            - FRAUD_DECLINED
+            - RAIL_UNAVAILABLE
+            - NOT_FOUND
+            - INTERNAL_ERROR
+        message:
+          type: string
+
+  responses:
+    Unauthorized:
+      description: API key ausente o inválida
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: IP no está en allowlist
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    TooManyRequests:
+      description: Rate limit excedido (ventana 60 s por API key + IP)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: Error interno no recuperable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"

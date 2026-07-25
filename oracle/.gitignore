@@ -1,4 +1,7 @@
+# Hereda reglas del monorepo: ../.gitignore
+# Reglas específicas del Oracle (si aplica):
+
 /target/
 .env
-*.pem
-*.key
+.env.*
+!.env.example

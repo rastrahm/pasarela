@@ -1,12 +1,24 @@
 //! Evaluación de fondos y gestión de holds por riel.
 
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::error::AppError;
+use crate::config::AppConfig;
+use crate::persistence::hold_store::HoldStore;
 
 /// Tipo de riel de fondeo / liquidación.
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    Eq,
+    sqlx::Type,
+)]
+#[sqlx(type_name = "funding_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum FundingType {
     TraditionalBank,
@@ -18,79 +30,74 @@ pub enum FundingType {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct FundStatus {
     pub sufficient: bool,
-    pub available_amount: f64,
+    pub available_amount: Decimal,
     pub currency: String,
 }
 
-/// Hold temporal sobre fondos del riel activo.
+/// Hold temporal sobre fondos del riel activo (respuesta de dominio).
 #[derive(Debug, Clone, Serialize, PartialEq)]
-pub struct HoldRecord {
+pub struct HoldSummary {
     pub hold_id: Uuid,
     pub funding_type: FundingType,
-    pub amount: f64,
+    pub amount: Decimal,
     pub currency: String,
 }
 
-/// Evalúa disponibilidad de fondos según el riel activo (simulado en Fase 2).
+/// Evalúa disponibilidad de fondos según el riel activo y holds vigentes.
 ///
 /// # Inputs
+/// - `rail_provider`: consulta saldo bruto al riel (HTTP/RPC/config).
+/// - `config`: spread buffer Binance y parámetros auxiliares.
+/// - `hold_store`: store para sumar holds activos.
 /// - `amount`: monto solicitado.
 /// - `currency`: moneda del pago.
 /// - `funding_type`: riel a consultar.
 ///
 /// # Returns
-/// `FundStatus` con saldo simulado o error si el riel no responde.
-pub fn evaluate_funds(
-    amount: f64,
+/// `FundStatus` con saldo disponible neto de holds activos.
+pub async fn evaluate_funds(
+    rail_provider: &dyn crate::rail_adapters::RailBalanceProvider,
+    config: &AppConfig,
+    hold_store: &dyn HoldStore,
+    amount: Decimal,
     currency: &str,
     funding_type: FundingType,
-) -> Result<FundStatus, AppError> {
-    let available = simulated_balance(funding_type);
-    let spread_adjusted = apply_spread_buffer(available, funding_type);
+) -> Result<FundStatus, crate::rail_adapters::RailAdapterError> {
+    let configured = rail_provider
+        .fetch_balance(funding_type, currency)
+        .await?;
+    let reserved = hold_store
+        .sum_active_holds(funding_type)
+        .await
+        .map_err(|err| crate::rail_adapters::RailAdapterError::Unavailable(err.to_string()))?;
+
+    let gross_available = configured
+        .checked_sub(reserved)
+        .ok_or_else(|| {
+            crate::rail_adapters::RailAdapterError::InvalidResponse(
+                "saldo reservado excede balance del riel".into(),
+            )
+        })?;
+
+    let available = apply_spread_buffer(gross_available, funding_type, config);
 
     Ok(FundStatus {
-        sufficient: spread_adjusted >= amount,
-        available_amount: spread_adjusted,
+        sufficient: available >= amount,
+        available_amount: available,
         currency: currency.to_string(),
     })
 }
 
-/// Crea un hold preventivo sobre el monto autorizado.
-///
-/// # Inputs
-/// - `amount`, `currency`, `funding_type`: datos del hold.
-///
-/// # Returns
-/// `HoldRecord` con identificador único o error si fondos insuficientes.
-pub fn create_hold(
-    amount: f64,
-    currency: &str,
+fn apply_spread_buffer(
+    balance: Decimal,
     funding_type: FundingType,
-) -> Result<HoldRecord, AppError> {
-    let status = evaluate_funds(amount, currency, funding_type)?;
-    if !status.sufficient {
-        return Err(AppError::InsufficientFunds);
-    }
-
-    Ok(HoldRecord {
-        hold_id: Uuid::new_v4(),
-        funding_type,
-        amount,
-        currency: currency.to_string(),
-    })
-}
-
-fn simulated_balance(funding_type: FundingType) -> f64 {
+    config: &AppConfig,
+) -> Decimal {
     match funding_type {
-        FundingType::TraditionalBank => 10_000.0,
-        FundingType::BinanceCex => 5_000.0,
-        FundingType::SolanaWallet => 2_500.0,
-    }
-}
-
-fn apply_spread_buffer(balance: f64, funding_type: FundingType) -> f64 {
-    match funding_type {
-        FundingType::BinanceCex => balance * 0.98,
+        FundingType::BinanceCex => {
+            let factor = Decimal::ONE - config.binance_spread_buffer_pct;
+            balance * factor
+        }
         _ => balance,
     }
 }
@@ -98,24 +105,166 @@ fn apply_spread_buffer(balance: f64, funding_type: FundingType) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::async_trait;
+    use crate::persistence::models::HoldRecord;
+    use crate::rail_adapters::MockRailBalanceProvider;
+    use std::str::FromStr;
 
-    #[test]
-    fn sufficient_funds_for_small_amount() {
-        let status = evaluate_funds(100.0, "USD", FundingType::TraditionalBank)
-            .expect("evaluate");
+    struct MockHoldStore {
+        reserved: Decimal,
+    }
+
+    #[async_trait]
+    impl HoldStore for MockHoldStore {
+        async fn create_hold(
+            &self,
+            _tx: &mut sqlx::PgTransaction<'_>,
+            _hold: crate::persistence::models::CreateHold,
+        ) -> Result<HoldRecord, crate::persistence::error::StoreError> {
+            unimplemented!()
+        }
+
+        async fn get_hold(
+            &self,
+            _hold_id: Uuid,
+        ) -> Result<Option<HoldRecord>, crate::persistence::error::StoreError> {
+            unimplemented!()
+        }
+
+        async fn release_hold(
+            &self,
+            _hold_id: Uuid,
+        ) -> Result<HoldRecord, crate::persistence::error::StoreError> {
+            unimplemented!()
+        }
+
+        async fn sum_active_holds(
+            &self,
+            _funding_type: FundingType,
+        ) -> Result<Decimal, crate::persistence::error::StoreError> {
+            Ok(self.reserved)
+        }
+
+        async fn expire_stale_holds(
+            &self,
+        ) -> Result<u64, crate::persistence::error::StoreError> {
+            Ok(0)
+        }
+
+        async fn update_status_in_tx(
+            &self,
+            _tx: &mut sqlx::PgTransaction<'_>,
+            _hold_id: Uuid,
+            _status: crate::persistence::models::HoldStatus,
+        ) -> Result<HoldRecord, crate::persistence::error::StoreError> {
+            unimplemented!()
+        }
+    }
+
+    fn dec(value: &str) -> Decimal {
+        Decimal::from_str(value).expect("decimal")
+    }
+
+    fn test_config() -> AppConfig {
+        AppConfig {
+            host: "127.0.0.1".to_string(),
+            port: 8081,
+            database_url: "postgres://localhost/oracle".to_string(),
+            api_key: "test".to_string(),
+            allowed_callers: vec![],
+            rate_limit_per_minute: 100,
+            rail_timeout_secs: 5,
+            hold_ttl_secs: 300,
+            ttl_cleanup_interval_secs: 60,
+            traditional_bank_balance: dec("10000"),
+            binance_cex_balance: dec("5000"),
+            solana_wallet_balance: dec("2500"),
+            binance_spread_buffer_pct: dec("0.02"),
+            binance_cex_base_url: "http://127.0.0.1:8083".to_string(),
+            binance_cex_api_key: "test-binance-key".to_string(),
+            solana_rpc_url: "http://127.0.0.1:8899".to_string(),
+            solana_wallet_pubkey: "DemoWallet1111111111111111111111111111111".to_string(),
+            solana_token_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
+            antifraud_base_url: "http://127.0.0.1:8082".to_string(),
+            antifraud_api_key: "test".to_string(),
+            antifraud_timeout_secs: 5,
+        }
+    }
+
+    #[tokio::test]
+    async fn sufficient_funds_for_small_amount() {
+        let config = test_config();
+        let rail = MockRailBalanceProvider::from_config(&config);
+        let store = MockHoldStore {
+            reserved: dec("0"),
+        };
+        let status = evaluate_funds(
+            &rail,
+            &config,
+            &store,
+            dec("100"),
+            "USD",
+            FundingType::TraditionalBank,
+        )
+        .await
+        .expect("evaluate");
+
         assert!(status.sufficient);
     }
 
-    #[test]
-    fn insufficient_funds_for_large_amount() {
-        let status = evaluate_funds(999_999.0, "USD", FundingType::SolanaWallet)
-            .expect("evaluate");
+    #[tokio::test]
+    async fn insufficient_funds_when_reserved_exceeds_balance() {
+        let config = test_config();
+        let rail = MockRailBalanceProvider::from_config(&config);
+        let store = MockHoldStore {
+            reserved: dec("9999"),
+        };
+        let status = evaluate_funds(
+            &rail,
+            &config,
+            &store,
+            dec("100"),
+            "USD",
+            FundingType::TraditionalBank,
+        )
+        .await
+        .expect("evaluate");
+
         assert!(!status.sufficient);
     }
 
-    #[test]
-    fn create_hold_rejects_insufficient() {
-        let result = create_hold(999_999.0, "USD", FundingType::BinanceCex);
-        assert!(matches!(result, Err(AppError::InsufficientFunds)));
+    #[tokio::test]
+    async fn binance_spread_reduces_available() {
+        let config = test_config();
+        let rail = MockRailBalanceProvider::from_config(&config);
+        let store = MockHoldStore {
+            reserved: dec("0"),
+        };
+        let status = evaluate_funds(
+            &rail,
+            &config,
+            &store,
+            dec("4900"),
+            "USD",
+            FundingType::BinanceCex,
+        )
+        .await
+        .expect("evaluate");
+
+        assert!(status.sufficient);
+        assert!(status.available_amount < dec("5000"));
+
+        let status_large = evaluate_funds(
+            &rail,
+            &config,
+            &store,
+            dec("4901"),
+            "USD",
+            FundingType::BinanceCex,
+        )
+        .await
+        .expect("evaluate");
+
+        assert!(!status_large.sufficient);
     }
 }
