@@ -12,8 +12,8 @@
 | **Objetivo** | Procesador de pagos con tarjeta y liquidación mutable en tres rieles (Banco, Binance CEX, Solana) |
 | **Enfoque** | Desarrollo secuencial por fases; confirmación explícita antes de avanzar |
 | **Unidades de despliegue** | `pasarela/` + `oracle/` + `antifraud/` (monorepo D5) |
-| **Fase actual** | **Fase 3 — Solana/Anchor** *(3.2 cerrada 2026-07-25)* |
-| **Próximo hito** | 3.3 PDA `SettlementState` + 3.4 `process_payment` |
+| **Fase actual** | **Fase 3 — Solana/Anchor** *(3.3 cerrada 2026-07-25)* |
+| **Próximo hito** | 3.4 `process_payment` (transfer SPL + contadores) |
 
 ### Estado actual del repositorio
 
@@ -226,7 +226,7 @@ Programa Anchor `payment-settlement` con instrucción `process_payment`, transfe
 |---|------|---------|
 | 3.1 | Inicializar proyecto Anchor en `programs/payment-settlement/` | ✅ `Anchor.toml`, estructura estándar, bootstrap `initialize`, 2 tests TS |
 | 3.2 | Escribir tests TypeScript **antes** de la lógica | ✅ 4 casos §7.4 + helpers SPL/PDA (ROJO hasta 3.4–3.6) |
-| 3.3 | Definir `SettlementState` PDA | Seeds: `["settlement", merchant.key()]` |
+| 3.3 | Definir `SettlementState` PDA | ✅ Seeds `["settlement", merchant]`, init + 6 tests PDA |
 | 3.4 | Implementar `process_payment` | Transfer SPL + actualizar contadores PDA |
 | 3.5 | Emitir evento `PaymentProcessed` | Sin PII |
 | 3.6 | Validaciones `#[derive(Accounts)]` explícitas | `signer`, `owner`, `seeds`, `bump`, mint |

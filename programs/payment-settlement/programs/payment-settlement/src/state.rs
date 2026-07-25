@@ -1,19 +1,33 @@
 use anchor_lang::prelude::*;
 
-/// Seed de la PDA `SettlementState` — ver Arquitectura §7.2.
+/// Seed de la PDA `SettlementState` — ver Arquitectura §7.2 / Casos-de-Uso §3.4.
 pub const SETTLEMENT_SEED: &[u8] = b"settlement";
 
 /// Estado acumulado de liquidaciones por comercio (PDA).
+///
+/// Seeds: `[SETTLEMENT_SEED, merchant.as_ref()]`
+/// Program owner: `payment-settlement`
 #[account]
+#[derive(InitSpace)]
 pub struct SettlementState {
+    /// Comercio dueño de esta PDA (repetido on-chain para `has_one` en instrucciones).
     pub merchant: Pubkey,
+    /// Suma acumulada de montos liquidados (tokens SPL base units).
     pub total_amount: u64,
+    /// Cantidad de pagos procesados exitosamente.
     pub payment_count: u64,
+    /// Bump canonical de la PDA — almacenado para evitar recalcular en CPI.
     pub bump: u8,
 }
 
 impl SettlementState {
-    pub const LEN: usize = 8 + 32 + 8 + 8 + 1;
+    /// Espacio rent-exempt incluyendo discriminador Anchor (8 bytes).
+    pub const LEN: usize = 8 + Self::INIT_SPACE;
+}
+
+/// Deriva la PDA `SettlementState` para un comercio.
+pub fn find_settlement_pda(program_id: &Pubkey, merchant: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[SETTLEMENT_SEED, merchant.as_ref()], program_id)
 }
 
 /// Evento de auditoría on-chain — sin PII (Arquitectura §7.3).
@@ -23,4 +37,14 @@ pub struct PaymentProcessed {
     pub brand_code: u8,
     pub settlement_rail_id: u64,
     pub timestamp: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn settlement_state_len_matches_init_space() {
+        assert_eq!(SettlementState::LEN, 8 + SettlementState::INIT_SPACE);
+    }
 }

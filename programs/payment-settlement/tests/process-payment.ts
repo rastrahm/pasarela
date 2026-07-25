@@ -25,7 +25,6 @@ import {
   processPaymentSigners,
   readTokenBalance,
   setupProcessPaymentContext,
-  settlementPda,
 } from "./helpers/token";
 
 describe("process_payment (TDD §7.4)", () => {
@@ -117,7 +116,6 @@ describe("process_payment (TDD §7.4)", () => {
       .accountsPartial({
         settlementState: ctx.settlementState,
         merchant: ctx.tokens.merchant.publicKey,
-        authority: ctx.tokens.merchant.publicKey,
       })
       .signers([ctx.tokens.merchant])
       .rpc();
@@ -192,17 +190,5 @@ describe("process_payment (TDD §7.4)", () => {
     } finally {
       await program.removeEventListener(listener);
     }
-  });
-});
-
-describe("process_payment PDA seeds", () => {
-  it("derives settlement PDA with seeds [settlement, merchant]", () => {
-    const merchant = Keypair.generate().publicKey;
-    const [pda, bump] = settlementPda(
-      anchor.workspace.paymentSettlement.programId,
-      merchant,
-    );
-    expect(bump).to.be.at.most(255);
-    expect(pda.toBase58()).to.match(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
   });
 });

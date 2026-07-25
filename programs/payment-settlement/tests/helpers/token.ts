@@ -110,7 +110,7 @@ export async function initSettlementState(
   const [settlementState, bump] = settlementPda(program.programId, merchant);
 
   await program.methods
-    .initializeSettlement(bump)
+    .initializeSettlement()
     .accountsPartial({
       merchant,
       settlementState,

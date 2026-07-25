@@ -60,11 +60,21 @@ Program ID (local/devnet scaffold): `4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564
 
 | Paso | Entregable |
 |------|------------|
-| 3.3 | PDA `SettlementState` — seeds `["settlement", merchant]` *(scaffold parcial en lib.rs)* |
 | 3.4 | Instrucción `process_payment` — hacer verde los 4 tests §7.4 |
 | 3.5 | Evento `PaymentProcessed` |
-| 3.6 | Constraints explícitos en `#[derive(Accounts)]` |
+| 3.6 | Constraints explícitos restantes en `#[derive(Accounts)]` |
 | 3.8 | `anchor test` verde |
+
+### PDA `SettlementState` (3.3)
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `merchant` | Pubkey | Comercio (seed) |
+| `total_amount` | u64 | Suma liquidada |
+| `payment_count` | u64 | Pagos exitosos |
+| `bump` | u8 | Bump canonical |
+
+Seeds: `["settlement", merchant.as_ref()]`. Tests: `tests/settlement-state.ts`.
 
 ### Estado TDD (3.2)
 

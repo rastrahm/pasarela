@@ -1,14 +1,12 @@
 //! Programa Anchor `payment-settlement` — liquidación on-chain del riel Solana (Fase 3).
 //!
-//! Instrucciones previstas:
-//! - `process_payment`: transferencia SPL + actualización de PDA `SettlementState`
-//! - Evento `PaymentProcessed` sin PII (solo amount, brand_code, settlement_rail_id)
-//!
 //! Ver [Casos-de-Uso UC-07](../../../Doc/Casos-de-Uso-ER-Flujos.md) y Plan §7.
 
 use anchor_lang::prelude::*;
 
-pub use state::{PaymentProcessed, SettlementState, SETTLEMENT_SEED};
+pub use state::{
+    find_settlement_pda, PaymentProcessed, SettlementState, SETTLEMENT_SEED,
+};
 
 mod state;
 
@@ -27,19 +25,29 @@ pub mod payment_settlement {
         Ok(())
     }
 
-    /// @notice Inicializa la PDA `SettlementState` de un comercio (Fase 3.3).
-    /// @param ctx Cuentas del comercio, pagador y system program.
-    /// @param bump Bump canonical de la PDA.
-    /// @return Result<()> Ok si la cuenta queda inicializada.
-    pub fn initialize_settlement(
-        ctx: Context<InitializeSettlement>,
-        bump: u8,
-    ) -> Result<()> {
+    /// @notice Crea e inicializa la PDA `SettlementState` de un comercio.
+    /// @dev Seeds: `[SETTLEMENT_SEED, merchant.key()]`. Una PDA por merchant.
+    /// @param ctx Pagador (rent), merchant (seed) y system program.
+    /// @return Result<()> Ok si la PDA queda inicializada con contadores en cero.
+    pub fn initialize_settlement(ctx: Context<InitializeSettlement>) -> Result<()> {
+        let merchant_key = ctx.accounts.merchant.key();
+        let (expected_pda, expected_bump) = find_settlement_pda(ctx.program_id, &merchant_key);
+        require_keys_eq!(
+            ctx.accounts.settlement_state.key(),
+            expected_pda,
+            PaymentSettlementError::InvalidSettlementPda
+        );
+        require_eq!(
+            ctx.bumps.settlement_state,
+            expected_bump,
+            PaymentSettlementError::InvalidSettlementPda
+        );
+
         let state = &mut ctx.accounts.settlement_state;
-        state.merchant = ctx.accounts.merchant.key();
+        state.merchant = merchant_key;
         state.total_amount = 0;
         state.payment_count = 0;
-        state.bump = bump;
+        state.bump = ctx.bumps.settlement_state;
         Ok(())
     }
 
@@ -53,11 +61,6 @@ pub mod payment_settlement {
         total_amount: u64,
         payment_count: u64,
     ) -> Result<()> {
-        require_keys_eq!(
-            ctx.accounts.settlement_state.merchant,
-            ctx.accounts.merchant.key(),
-            PaymentSettlementError::Unauthorized
-        );
         let state = &mut ctx.accounts.settlement_state;
         state.total_amount = total_amount;
         state.payment_count = payment_count;
@@ -65,7 +68,7 @@ pub mod payment_settlement {
     }
 
     /// @notice Procesa un pago on-chain transferiendo tokens SPL al comercio.
-    /// @dev Emite evento `PaymentProcessed` sin PII. Lógica de liquidación: Fase 3.4.
+    /// @dev Lógica de liquidación: Fase 3.4. PDA validada por seeds (Fase 3.3).
     /// @param _ctx Cuentas SPL, PDA `SettlementState` y programas del sistema.
     /// @param _amount Cantidad de tokens SPL a transferir.
     /// @param _brand_code Código numérico de marca (sin PAN).
@@ -87,10 +90,11 @@ pub struct Initialize {}
 
 /// Cuentas para crear la PDA `SettlementState` (Fase 3.3).
 #[derive(Accounts)]
+#[instruction()]
 pub struct InitializeSettlement<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    /// CHECK: merchant pubkey usada como seed de la PDA.
+    /// CHECK: merchant pubkey usada como seed; no requiere firma en el init.
     pub merchant: UncheckedAccount<'info>,
     #[account(
         init,
@@ -109,12 +113,14 @@ pub struct SetSettlementTotals<'info> {
     pub merchant: Signer<'info>,
     #[account(
         mut,
+        seeds = [SETTLEMENT_SEED, merchant.key().as_ref()],
+        bump = settlement_state.bump,
         has_one = merchant @ PaymentSettlementError::Unauthorized,
     )]
     pub settlement_state: Account<'info, SettlementState>,
 }
 
-/// Cuentas para `process_payment` — constraints explícitos en Fase 3.6.
+/// Cuentas para `process_payment`.
 #[derive(Accounts)]
 pub struct ProcessPayment<'info> {
     pub payer: Signer<'info>,
@@ -122,10 +128,15 @@ pub struct ProcessPayment<'info> {
     pub payer_token_account: Account<'info, anchor_spl::token::TokenAccount>,
     #[account(mut)]
     pub merchant_token_account: Account<'info, anchor_spl::token::TokenAccount>,
-    /// Merchant cuya PDA `SettlementState` acumula contadores (seed derivada de esta clave).
-    /// CHECK: validación de seeds en Fase 3.6.
+    /// CHECK: merchant pubkey — seed de la PDA `SettlementState`.
     pub merchant: UncheckedAccount<'info>,
-    #[account(mut)]
+    #[account(
+        mut,
+        seeds = [SETTLEMENT_SEED, merchant.key().as_ref()],
+        bump = settlement_state.bump,
+        has_one = merchant @ PaymentSettlementError::Unauthorized,
+        constraint = settlement_state.to_account_info().data_len() >= SettlementState::LEN @ PaymentSettlementError::InsufficientAccountSpace,
+    )]
     pub settlement_state: Account<'info, SettlementState>,
     pub token_program: Program<'info, anchor_spl::token::Token>,
     pub system_program: Program<'info, System>,
@@ -137,6 +148,8 @@ pub enum PaymentSettlementError {
     NotImplemented,
     #[msg("Signer is not authorized for this payment")]
     Unauthorized,
+    #[msg("Settlement PDA address or bump does not match merchant seeds")]
+    InvalidSettlementPda,
     #[msg("Settlement account data length is insufficient")]
     InsufficientAccountSpace,
     #[msg("Arithmetic overflow in payment amount or counters")]
