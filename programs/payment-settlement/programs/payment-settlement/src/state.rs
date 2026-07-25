@@ -26,11 +26,20 @@ impl SettlementState {
 }
 
 /// Deriva la PDA `SettlementState` para un comercio.
+///
+/// Seeds: `[SETTLEMENT_SEED, merchant.as_ref()]`.
+///
+/// @param program_id Program ID del contrato Anchor.
+/// @param merchant Pubkey del comercio (seed).
+/// @return (Pubkey, u8) Dirección PDA y bump canonical.
 pub fn find_settlement_pda(program_id: &Pubkey, merchant: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[SETTLEMENT_SEED, merchant.as_ref()], program_id)
 }
 
-/// Evento de auditoría on-chain — sin PII (Arquitectura §7.3).
+/// Evento de auditoría on-chain — sin PII (Arquitectura §7.3 / UC-07).
+///
+/// Campos permitidos: monto, código de marca numérico, riel y timestamp.
+/// Prohibido: PAN, nombre, email u otro dato personal identificable.
 #[event]
 pub struct PaymentProcessed {
     pub amount: u64,

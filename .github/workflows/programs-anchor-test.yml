@@ -1,4 +1,4 @@
-# Gate Fase 3.8 — anchor test en validador local (Plan §13.1)
+# Gate Fase 3.8 + 3.10 — anchor test + documentación de instrucciones
 name: Programs — anchor test
 
 on:
@@ -69,6 +69,9 @@ jobs:
 
       - name: Install npm dependencies
         run: npm ci
+
+      - name: Lint instruction docs (@notice/@param/@return)
+        run: npm run lint:docs
 
       - name: Build SBF + IDL (platform-tools v1.52)
         run: npm run build

@@ -27,6 +27,8 @@ echo "==> Anchor: $(anchor --version)"
 echo "==> Platform-tools (build): v1.52 (ver npm run build)"
 
 npm ci
+npm run lint:docs
 npm test
 
 echo "==> Gate 3.8 OK — anchor test verde"
+echo "==> Gate 3.10 OK — documentación @notice/@param/@return"

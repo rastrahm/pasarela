@@ -42,7 +42,8 @@ programs/payment-settlement/
 cd programs/payment-settlement
 npm install
 npm test                 # build + anchor test (17 tests, validador local)
-npm run test:ci          # mismo gate que CI (scripts/ci-test.sh)
+npm run test:ci          # gate 3.8 + 3.10 (scripts/ci-test.sh)
+npm run lint:docs        # verifica @notice/@param/@return en instrucciones
 ```
 
 ### CI (gate 3.8)
@@ -88,7 +89,7 @@ Variables de entorno: [`.env.example`](.env.example) (`SOLANA_RPC_URL`, `PAYMENT
 | Paso | Entregable |
 |------|------------|
 | 3.9 | ✅ Devnet — `deploy/devnet.json` |
-| 3.10 | Documentación `@notice/@param/@return` |
+| 3.10 | ✅ `@notice/@param/@return` — gate `npm run lint:docs` |
 | Gate Fase 3 | Acta de cierre + confirmación Fase 4 |
 
 ### PDA `SettlementState` (3.3)

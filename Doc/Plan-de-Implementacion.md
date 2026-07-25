@@ -12,8 +12,8 @@
 | **Objetivo** | Procesador de pagos con tarjeta y liquidación mutable en tres rieles (Banco, Binance CEX, Solana) |
 | **Enfoque** | Desarrollo secuencial por fases; confirmación explícita antes de avanzar |
 | **Unidades de despliegue** | `pasarela/` + `oracle/` + `antifraud/` (monorepo D5) |
-| **Fase actual** | **Fase 3 — Solana/Anchor** *(3.9 devnet cerrada 2026-07-25)* |
-| **Próximo hito** | Gate Fase 3 (acta) + paso 3.10 documentación |
+| **Fase actual** | **Fase 3 — Solana/Anchor** *(3.10 documentación cerrada 2026-07-25)* |
+| **Próximo hito** | Gate Fase 3 (acta) + confirmación Fase 4 |
 
 ### Estado actual del repositorio
 
@@ -233,7 +233,7 @@ Programa Anchor `payment-settlement` con instrucción `process_payment`, transfe
 | 3.7 | Errores personalizados `#[error_code]` | ✅ Unauthorized, InvalidMint, AmountOverflow, etc. |
 | 3.8 | Ejecutar `anchor test` en local validator | ✅ 17/17 verdes + workflow CI |
 | 3.9 | Desplegar en devnet (opcional MVP) | ✅ Program ID `4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564B` — ver `deploy/devnet.json` |
-| 3.10 | Documentar instrucciones con `@notice/@param/@return` | Por cada instrucción pública |
+| 3.10 | Documentar instrucciones con `@notice/@param/@return` | ✅ 5 instrucciones + gate `npm run lint:docs` |
 
 ### Entregables
 
