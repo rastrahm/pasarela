@@ -15,18 +15,18 @@ use crate::persistence::hold_store::HoldStore;
 pub fn spawn_ttl_cleanup_task(hold_store: Arc<dyn HoldStore>, interval_secs: u64) {
     tokio::spawn(async move {
         let interval = Duration::from_secs(interval_secs);
-        info!(interval_secs, "tarea TTL de holds iniciada");
+        info!(interval_secs, event = "ttl_cleanup_started", "tarea TTL de holds iniciada");
 
         loop {
             tokio::time::sleep(interval).await;
 
             match hold_store.expire_stale_holds().await {
                 Ok(count) if count > 0 => {
-                    debug!(expired = count, "holds expirados por tarea background");
+                    debug!(expired = count, event = "ttl_holds_expired", "holds expirados por tarea background");
                 }
                 Ok(_) => {}
                 Err(err) => {
-                    error!(error = %err, "fallo al expirar holds en background");
+                    error!(error = %err, event = "ttl_cleanup_failed", "fallo al expirar holds en background");
                 }
             }
         }

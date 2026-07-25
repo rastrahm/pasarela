@@ -13,10 +13,14 @@ use crate::persistence::models::{
     AuditLogEntry, AuthResult, CreateAuthorizationRequest, CreateHold, HoldStatus,
 };
 use crate::persistence::AppState;
+use crate::logging::{
+    authorization_approved, authorization_rejected, authorization_started,
+    dependency_unavailable, hold_released, invalid_card_attempt,
+};
 use crate::validation::{validate_card, CardPayload, CardValidationResult};
 
 /// Solicitud de autorización recibida del Gateway.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AuthorizeInput {
     pub gateway_request_id: Uuid,
     pub card: CardPayload,
@@ -48,21 +52,58 @@ pub async fn authorize(
     state: &AppState,
     input: AuthorizeInput,
 ) -> Result<AuthorizeOutput, AppError> {
-    let validation = validate_card(&input.card)?;
+    let validation = match validate_card(&input.card) {
+        Ok(result) => result,
+        Err(AppError::InvalidCard) => {
+            invalid_card_attempt(input.gateway_request_id);
+            return Err(AppError::InvalidCard);
+        }
+        Err(err) => return Err(err),
+    };
+
+    authorization_started(
+        input.gateway_request_id,
+        &validation,
+        input.amount,
+        &input.currency,
+        input.funding_type,
+        input.caller_ip.as_deref(),
+    );
 
     score_antifraud(state, &input, &validation).await?;
 
-    let fund_status = evaluate_funds(
+    let fund_status = match evaluate_funds(
+        state.rail_provider.as_ref(),
         &state.config,
         state.hold_store.as_ref(),
         input.amount,
         &input.currency,
         input.funding_type,
     )
-    .await?;
+    .await
+    {
+        Ok(status) => status,
+        Err(err) => {
+            persist_rejected_request(state, &input, &validation, "rail_unavailable").await?;
+            dependency_unavailable(
+                "rail",
+                &err.to_string(),
+                Some(input.gateway_request_id),
+            );
+            return Err(AppError::RailUnavailable);
+        }
+    };
 
     if !fund_status.sufficient {
         persist_rejected_request(state, &input, &validation, "insufficient_funds").await?;
+        authorization_rejected(
+            input.gateway_request_id,
+            "insufficient_funds",
+            validation.brand,
+            &validation.last_four,
+            input.amount,
+            input.funding_type,
+        );
         return Err(AppError::InsufficientFunds);
     }
 
@@ -134,6 +175,17 @@ pub async fn authorize(
         .await
         .map_err(|err| AppError::Internal(err.to_string()))?;
 
+    authorization_approved(
+        input.gateway_request_id,
+        hold_record.id,
+        validation.brand,
+        validation.brand_code,
+        &validation.last_four,
+        input.amount,
+        &input.currency,
+        input.funding_type,
+    );
+
     Ok(AuthorizeOutput {
         hold_id: hold_record.id,
         brand: format!("{:?}", validation.brand).to_lowercase(),
@@ -152,6 +204,7 @@ pub async fn release_hold(state: &AppState, hold_id: Uuid) -> Result<ReleaseHold
         .map_err(map_store_error)?;
 
     if hold.status == HoldStatus::Released {
+        hold_released(hold.id, "released");
         let audit = AuditLogEntry {
             id: Uuid::new_v4(),
             hold_id: Some(hold.id),
@@ -190,16 +243,32 @@ async fn score_antifraud(
         Ok(_) => Ok(()),
         Err(AntifraudClientError::Declined) => {
             persist_rejected_request(state, input, validation, "fraud_declined").await?;
+            authorization_rejected(
+                input.gateway_request_id,
+                "fraud_declined",
+                validation.brand,
+                &validation.last_four,
+                input.amount,
+                input.funding_type,
+            );
             Err(AppError::FraudDeclined)
         }
         Err(AntifraudClientError::Unavailable(reason)) => {
             persist_rejected_request(state, input, validation, "antifraud_unavailable").await?;
-            tracing::warn!(reason = %reason, "antifraude no disponible — fail closed");
+            dependency_unavailable(
+                "antifraud",
+                &reason,
+                Some(input.gateway_request_id),
+            );
             Err(AppError::RailUnavailable)
         }
         Err(AntifraudClientError::InvalidResponse(reason)) => {
             persist_rejected_request(state, input, validation, "antifraud_invalid_response").await?;
-            tracing::warn!(reason = %reason, "respuesta antifraude inválida — fail closed");
+            dependency_unavailable(
+                "antifraud",
+                &reason,
+                Some(input.gateway_request_id),
+            );
             Err(AppError::RailUnavailable)
         }
     }

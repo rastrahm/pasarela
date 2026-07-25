@@ -3,19 +3,16 @@
 use anyhow::Context;
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use tracing_subscriber::EnvFilter;
 
 use oracle_authorization::{
-    build_app, config::AppConfig, init_database, persistence::AppState, ttl,
+    build_app, config::AppConfig, init_database, logging, persistence::AppState, ttl,
 };
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
 
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .init();
+    logging::init_subscriber();
 
     let config = Arc::new(AppConfig::from_env().context("error cargando configuración")?);
     let listen_addr = config.listen_addr();
@@ -25,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
         .context("error conectando a PostgreSQL")?;
 
     let state = AppState::new(config.clone(), pool)
-        .map_err(|err| anyhow::anyhow!("cliente antifraude: {err}"))?;
+        .map_err(|err| anyhow::anyhow!("error inicializando clientes: {err}"))?;
 
     ttl::spawn_ttl_cleanup_task(
         state.hold_store.clone(),

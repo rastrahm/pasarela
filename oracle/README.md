@@ -33,13 +33,41 @@ ORACLE_DATABASE_URL=postgres://postgres:<password>@localhost:5432/oracle
 
 Las migraciones se aplican automáticamente al iniciar el servicio (`sqlx migrate`).
 
-### Saldos simulados por riel
+### Consulta de fondos por riel (Plan 2.6, UC-04)
+
+| Riel | Adapter | Fuente |
+|------|---------|--------|
+| `traditional_bank` | `ConfigTraditionalBankProvider` | `TRADITIONAL_BANK_BALANCE` |
+| `binance_cex` | `HttpBinanceCexProvider` | `GET /internal/v1/spot/balance` en `binance-sim/` |
+| `solana_wallet` | `RpcSolanaProvider` | JSON-RPC `getTokenAccountsByOwner` |
+
+Variables adicionales en `.env`:
+
+| Variable | Descripción | Default |
+|----------|-------------|---------|
+| `BINANCE_CEX_BASE_URL` | URL del simulador Binance | `http://127.0.0.1:8083` |
+| `BINANCE_CEX_API_KEY` | Clave compartida con `binance-sim/` | obligatoria |
+| `SOLANA_RPC_URL` | Endpoint RPC Solana | `http://127.0.0.1:8899` |
+| `SOLANA_WALLET_PUBKEY` | Wallet a consultar | obligatoria |
+| `SOLANA_TOKEN_MINT` | Mint SPL (USDC) | mainnet USDC |
+
+Los saldos `BINANCE_CEX_BALANCE` / `SOLANA_WALLET_BALANCE` se usan en tests vía `MockRailBalanceProvider`. En producción el saldo viene del HTTP/RPC.
+
+Levantar el simulador Binance:
+
+```bash
+cd ../binance-sim && cargo run
+```
+
+Si el riel no responde (timeout/RPC caído) → `503 RAIL_UNAVAILABLE` (fail closed).
+
+### Saldos de respaldo (tests y banco ficticio)
 
 | Variable | Descripción | Default |
 |----------|-------------|---------|
 | `TRADITIONAL_BANK_BALANCE` | Saldo banco ficticio | `10000` |
-| `BINANCE_CEX_BALANCE` | Saldo Binance Spot simulado | `5000` |
-| `SOLANA_WALLET_BALANCE` | Saldo wallet Solana simulado | `2500` |
+| `BINANCE_CEX_BALANCE` | Mock/tests Binance | `5000` |
+| `SOLANA_WALLET_BALANCE` | Mock/tests Solana | `2500` |
 | `BINANCE_SPREAD_BUFFER_PCT` | Spread buffer hold Binance (D4) | `0.02` |
 
 Los holds activos se restan del saldo disponible al evaluar fondos.
@@ -61,12 +89,14 @@ Healthcheck: `GET http://localhost:8081/health`
 | `POST` | `/internal/v1/hold/release` | Liberar hold si falla el settlement |
 | `GET` | `/health` | Healthcheck (sin auth) |
 
+Contrato completo: [docs/API-v1.md](docs/API-v1.md) · OpenAPI: [openapi/v1.yaml](openapi/v1.yaml)
+
 ## Seguridad
 
 - Red privada: no exponer a Internet
 - Header `X-API-KEY` obligatorio en `/internal/v1/*`
 - Allowlist de IP en `ORACLE_ALLOWED_CALLERS`
-- Rate limiting configurable
+- Rate limiting: ventana deslizante de 60 s por `X-API-KEY` + IP (`ORACLE_RATE_LIMIT_PER_MINUTE`, default 100) → `429`
 - PAN tokenizado en memoria; nunca persistido
 
 ## Tests
@@ -77,12 +107,29 @@ cargo test --lib
 
 # Integración (requiere PostgreSQL en ORACLE_DATABASE_URL)
 export ORACLE_DATABASE_URL=postgres://postgres:<password>@localhost:5432/oracle_test
-cargo test
+cargo test -- --test-threads=1
 ```
+
+Usar `--test-threads=1` evita deadlocks en la BD compartida entre tests de integración.
 
 - `tests/health_integration.rs` — healthcheck público
 - `tests/auth_security.rs` — rechazo sin API key / key inválida
 - `tests/hold_persistence.rs` — creación, release idempotente, fondos insuficientes
+- `tests/rail_adapters_integration.rs` — fail closed riel caído, Binance HTTP
+- `tests/logging_no_pii.rs` — ausencia de PAN/CVV en logs y audit log
+- `tests/security_fail_closed.rs` — allowlist CIDR, rate limit, fail closed sin holds (Plan 2.9)
+- `tests/gateway_contract.rs` — contrato Gateway ↔ Oracle vía `oracle-client` HTTP (Plan 2.11)
+- `tests/auth_security.rs` — UC-11 básico (401/403)
+- `tests/rate_limit_integration.rs` — 429 por API key + IP
+- `tests/antifraud_integration.rs` — fail closed antifraude
+
+## Logging estructurado (Plan 2.8)
+
+Eventos `tracing` con campos permitidos: `gateway_request_id`, `hold_id`, `brand`, `last_four`, `token_hash`, `amount`, `currency`, `funding_type`, `caller_ip`, `reason`.
+
+**Nunca** se registran: PAN, CVV, nombre del titular, cuerpos HTTP ni headers sensibles.
+
+Módulo: `src/logging/` · Detector PII: `contains_forbidden_pii()`.
 
 ## Despliegue
 
@@ -95,7 +142,7 @@ En producción, conectar el contenedor solo a la red Docker/VPC del Gateway.
 
 ## Relación con la pasarela
 
-El Gateway consume este servicio mediante el crate `pasarela/crates/oracle-client/` (pendiente de Fase 4). No hay dependencia Cargo directa entre proyectos.
+El Gateway consume este servicio mediante el crate [`crates/oracle-client`](../crates/oracle-client/) (DTOs + cliente HTTP). No hay dependencia Cargo directa entre proyectos.
 
 ## Servicio antifraude (UC-12)
 

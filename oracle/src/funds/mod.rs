@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::config::AppConfig;
-use crate::error::AppError;
 use crate::persistence::hold_store::HoldStore;
 
 /// Tipo de riel de fondeo / liquidación.
@@ -47,7 +46,8 @@ pub struct HoldSummary {
 /// Evalúa disponibilidad de fondos según el riel activo y holds vigentes.
 ///
 /// # Inputs
-/// - `config`: saldos configurados por entorno.
+/// - `rail_provider`: consulta saldo bruto al riel (HTTP/RPC/config).
+/// - `config`: spread buffer Binance y parámetros auxiliares.
 /// - `hold_store`: store para sumar holds activos.
 /// - `amount`: monto solicitado.
 /// - `currency`: moneda del pago.
@@ -56,21 +56,28 @@ pub struct HoldSummary {
 /// # Returns
 /// `FundStatus` con saldo disponible neto de holds activos.
 pub async fn evaluate_funds(
+    rail_provider: &dyn crate::rail_adapters::RailBalanceProvider,
     config: &AppConfig,
     hold_store: &dyn HoldStore,
     amount: Decimal,
     currency: &str,
     funding_type: FundingType,
-) -> Result<FundStatus, AppError> {
-    let configured = config.configured_balance(funding_type);
+) -> Result<FundStatus, crate::rail_adapters::RailAdapterError> {
+    let configured = rail_provider
+        .fetch_balance(funding_type, currency)
+        .await?;
     let reserved = hold_store
         .sum_active_holds(funding_type)
         .await
-        .map_err(|err| AppError::Internal(err.to_string()))?;
+        .map_err(|err| crate::rail_adapters::RailAdapterError::Unavailable(err.to_string()))?;
 
     let gross_available = configured
         .checked_sub(reserved)
-        .ok_or_else(|| AppError::Internal("saldo reservado excede balance configurado".into()))?;
+        .ok_or_else(|| {
+            crate::rail_adapters::RailAdapterError::InvalidResponse(
+                "saldo reservado excede balance del riel".into(),
+            )
+        })?;
 
     let available = apply_spread_buffer(gross_available, funding_type, config);
 
@@ -100,6 +107,7 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use crate::persistence::models::HoldRecord;
+    use crate::rail_adapters::MockRailBalanceProvider;
     use std::str::FromStr;
 
     struct MockHoldStore {
@@ -172,6 +180,11 @@ mod tests {
             binance_cex_balance: dec("5000"),
             solana_wallet_balance: dec("2500"),
             binance_spread_buffer_pct: dec("0.02"),
+            binance_cex_base_url: "http://127.0.0.1:8083".to_string(),
+            binance_cex_api_key: "test-binance-key".to_string(),
+            solana_rpc_url: "http://127.0.0.1:8899".to_string(),
+            solana_wallet_pubkey: "DemoWallet1111111111111111111111111111111".to_string(),
+            solana_token_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
             antifraud_base_url: "http://127.0.0.1:8082".to_string(),
             antifraud_api_key: "test".to_string(),
             antifraud_timeout_secs: 5,
@@ -180,11 +193,14 @@ mod tests {
 
     #[tokio::test]
     async fn sufficient_funds_for_small_amount() {
+        let config = test_config();
+        let rail = MockRailBalanceProvider::from_config(&config);
         let store = MockHoldStore {
             reserved: dec("0"),
         };
         let status = evaluate_funds(
-            &test_config(),
+            &rail,
+            &config,
             &store,
             dec("100"),
             "USD",
@@ -198,11 +214,14 @@ mod tests {
 
     #[tokio::test]
     async fn insufficient_funds_when_reserved_exceeds_balance() {
+        let config = test_config();
+        let rail = MockRailBalanceProvider::from_config(&config);
         let store = MockHoldStore {
             reserved: dec("9999"),
         };
         let status = evaluate_funds(
-            &test_config(),
+            &rail,
+            &config,
             &store,
             dec("100"),
             "USD",
@@ -216,11 +235,13 @@ mod tests {
 
     #[tokio::test]
     async fn binance_spread_reduces_available() {
+        let config = test_config();
+        let rail = MockRailBalanceProvider::from_config(&config);
         let store = MockHoldStore {
             reserved: dec("0"),
         };
-        let config = test_config();
         let status = evaluate_funds(
+            &rail,
             &config,
             &store,
             dec("4900"),
@@ -234,6 +255,7 @@ mod tests {
         assert!(status.available_amount < dec("5000"));
 
         let status_large = evaluate_funds(
+            &rail,
             &config,
             &store,
             dec("4901"),

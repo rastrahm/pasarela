@@ -22,6 +22,11 @@ pub struct AppConfig {
     pub binance_cex_balance: Decimal,
     pub solana_wallet_balance: Decimal,
     pub binance_spread_buffer_pct: Decimal,
+    pub binance_cex_base_url: String,
+    pub binance_cex_api_key: String,
+    pub solana_rpc_url: String,
+    pub solana_wallet_pubkey: String,
+    pub solana_token_mint: String,
     pub antifraud_base_url: String,
     pub antifraud_api_key: String,
     pub antifraud_timeout_secs: u64,
@@ -85,6 +90,19 @@ impl AppConfig {
         let binance_spread_buffer_pct =
             parse_decimal_env("BINANCE_SPREAD_BUFFER_PCT", "0.02")?;
 
+        let binance_cex_base_url = env::var("BINANCE_CEX_BASE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8083".to_string());
+        let binance_cex_api_key =
+            env::var("BINANCE_CEX_API_KEY").context("BINANCE_CEX_API_KEY es obligatoria")?;
+
+        let solana_rpc_url = env::var("SOLANA_RPC_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8899".to_string());
+        let solana_wallet_pubkey = env::var("SOLANA_WALLET_PUBKEY")
+            .context("SOLANA_WALLET_PUBKEY es obligatoria")?;
+        let solana_token_mint = env::var("SOLANA_TOKEN_MINT").unwrap_or_else(|_| {
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string()
+        });
+
         let antifraud_base_url = env::var("ANTIFRAUD_BASE_URL")
             .context("ANTIFRAUD_BASE_URL es obligatoria")?;
         let antifraud_api_key =
@@ -108,6 +126,11 @@ impl AppConfig {
             binance_cex_balance,
             solana_wallet_balance,
             binance_spread_buffer_pct,
+            binance_cex_base_url,
+            binance_cex_api_key,
+            solana_rpc_url,
+            solana_wallet_pubkey,
+            solana_token_mint,
             antifraud_base_url,
             antifraud_api_key,
             antifraud_timeout_secs,

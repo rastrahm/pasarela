@@ -27,4 +27,6 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 [dev-dependencies]
 axum = { version = "0.7", features = ["macros"] }
 http-body-util = "0.1"
+oracle-client = { path = "../crates/oracle-client" }
+serial_test = "3"
 tower = { version = "0.5", features = ["util"] }

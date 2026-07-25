@@ -10,20 +10,19 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
-use crate::auth::require_gateway_auth;
+use crate::api::{
+    AuthorizeRequest, AuthorizeResponse, HealthResponse, ReleaseHoldRequest, ReleaseHoldResponse,
+};
+use crate::auth::{require_gateway_auth, GatewayAuthState};
 use crate::error::AppError;
-use crate::funds::FundingType;
 use crate::persistence::models::HoldStatus;
 use crate::persistence::AppState;
 use crate::services::authorization::{self, AuthorizeInput};
-use crate::validation::CardPayload;
 
 /// Crea el router con healthcheck público e internal API protegida.
 pub fn create_router(state: Arc<AppState>) -> Router {
-    let config = state.config.clone();
+    let auth_state = GatewayAuthState::from_config(state.config.clone());
 
     let public = Router::new().route("/health", get(health));
 
@@ -31,7 +30,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/internal/v1/authorize", post(authorize))
         .route("/internal/v1/hold/release", post(release_hold))
         .layer(middleware::from_fn_with_state(
-            config,
+            auth_state,
             require_gateway_auth,
         ));
 
@@ -41,36 +40,12 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .with_state(state)
 }
 
-#[derive(Serialize)]
-struct HealthResponse {
-    status: &'static str,
-    service: &'static str,
-}
-
 /// Healthcheck sin autenticación para orquestación de contenedores.
 async fn health() -> Json<HealthResponse> {
     Json(HealthResponse {
-        status: "ok",
-        service: "oracle-authorization",
+        status: "ok".to_string(),
+        service: "oracle-authorization".to_string(),
     })
-}
-
-#[derive(Debug, Deserialize)]
-struct AuthorizeRequest {
-    gateway_request_id: Uuid,
-    card: CardPayload,
-    amount: f64,
-    currency: String,
-    funding_type: FundingType,
-}
-
-#[derive(Debug, Serialize)]
-struct AuthorizeResponse {
-    hold_id: Uuid,
-    brand: String,
-    brand_code: u8,
-    last_four: String,
-    gateway_request_id: Uuid,
 }
 
 /// Autoriza tarjeta, evalúa fondos y crea hold persistido (UC-03 + UC-04).
@@ -102,17 +77,6 @@ async fn authorize(
         last_four: output.last_four,
         gateway_request_id: output.gateway_request_id,
     }))
-}
-
-#[derive(Debug, Deserialize)]
-struct ReleaseHoldRequest {
-    hold_id: Uuid,
-}
-
-#[derive(Debug, Serialize)]
-struct ReleaseHoldResponse {
-    hold_id: Uuid,
-    status: String,
 }
 
 /// Libera un hold cuando el settlement del Gateway falla.

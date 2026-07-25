@@ -12,9 +12,10 @@ use tower::ServiceExt;
 
 #[tokio::test]
 async fn authorize_rejects_when_antifraud_declines() {
-    let app = common::setup_app_with_antifraud(Arc::new(MockAntifraudClient::with_behavior(
-        MockBehavior::Decline,
-    )))
+    let app = common::setup_app_with_antifraud(
+        Arc::new(MockAntifraudClient::with_behavior(MockBehavior::Decline)),
+        common::test_config(),
+    )
     .await;
 
     let body = common::sample_authorize_body(
@@ -49,9 +50,12 @@ async fn authorize_rejects_when_antifraud_declines() {
 
 #[tokio::test]
 async fn authorize_fail_closed_when_antifraud_unavailable() {
-    let app = common::setup_app_with_antifraud(Arc::new(MockAntifraudClient::with_behavior(
-        MockBehavior::Unavailable("timeout".to_string()),
-    )))
+    let app = common::setup_app_with_antifraud(
+        Arc::new(MockAntifraudClient::with_behavior(MockBehavior::Unavailable(
+            "timeout".to_string(),
+        ))),
+        common::test_config(),
+    )
     .await;
 
     let body = common::sample_authorize_body(
