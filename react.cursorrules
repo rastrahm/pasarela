@@ -1,0 +1,22 @@
+# React Rules
+## General Principles
+- **Components**: Functional components only. Use Hooks (`useState`, `useEffect`, `useMemo`) correctly.
+- **Composition**: Favor component composition over large, complex components.
+- **TDD**: Use React Testing Library and Vitest/Jest.
+
+## Standards
+- TypeScript: Strict interfaces. No `any`.
+- Use Zod for prop/data validation.
+- State Management: Prefer local state or Context API unless Redux/Zustand is strictly required.
+
+# React Rules
+- **Modern Standards**: Functional components and Hooks only. Use `pnpm` as the package manager.
+- **Performance**: Use `useCallback` and `useMemo` for expensive computations or to prevent unnecessary re-renders.
+- **State**: Favor Server Components (in Next.js) and keep Client state minimal.
+- **TDD**: Use Vitest + React Testing Library. Test user interactions, not implementation details.
+- **Explicit Development**: Prop types must be explicitly defined. Avoid "magic" global states; prefer explicit data flow.
+- **Function Documentation**: Use JSDoc for every component and helper:
+  - **Description**: What the UI component or hook does.
+  - **Props/Inputs**: Clear definition of each prop.
+  - **Output**: What it renders or returns.
+- **TDD**: Component tests must be written first.

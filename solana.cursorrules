@@ -1,0 +1,58 @@
+# Solana Rules (Anchor Framework)
+## General Principles
+- **Account Validation**: Always validate accounts in the `#[derive(Accounts)]` struct. Use `has_one`, `constraint`, and `seeds`.
+- **Architecture**: Separate instructions into different modules if the program is large.
+- **TDD**: Use Anchor's TypeScript tests or `program-test` in Rust.
+
+## Standards
+- **PDA Management**: Always use `seeds` and `bump` correctly to avoid security flaws.
+- **Compute Budget**: Monitor compute units. Optimize logic to stay within limits.
+- **Security**: Prevent "Account Substitution" and "Missing Ownership Check" attacks.
+
+# Solana Anchor Rules
+- **Account Safety**: Use `#[account(init, payer = ..., space = ...)]` properly. Always check `owner` and `signer`.
+- **Program ID**: Ensure `declare_id!` matches the deployment key.
+- **PDAs**: Use `find_program_address` and explain why certain seeds were chosen.
+- **Testing**: Use `anchor test` (TypeScript) or `program-test` (Rust).
+- **Explicit Development**: All account constraints in `#[derive(Accounts)]` must be explicit (`seeds`, `bump`, `owner`). No implicit account assumptions.
+- **Function Documentation**: Every instruction must have a comment block:
+  - **Instruction**: What it executes on-chain.
+  - **Accounts**: What accounts are involved and why.
+  - **Returns**: Result or specific ProgramError.
+  
+# Solana Anchor & Testing Rules
+
+## 1. Principios de Desarrollo Explícito
+- **Validación de Cuentas**: Todas las restricciones en los structs `#[derive(Accounts)]` deben ser explícitas. Usa `seeds`, `bump`, `payer`, y `space` de forma clara. No asumas propiedades de las cuentas.
+- **Manejo de Errores**: Prohibido el uso de `.unwrap()` o `.expect()`. Usa `Result<()>` y define errores personalizados en un bloque `#[error_code]`.
+- **Tipado Estricto**: Define tipos e interfaces claras para cada instrucción. Evita conversiones de tipos implícitas que puedan comprometer la precisión aritmética.
+
+## 2. Documentación Obligatoria por Función
+Cada instrucción (RPC) y función auxiliar debe incluir comentarios detallados:
+- **Descripción**: Qué hace la función en la blockchain.
+- **Entradas (@param / Context)**: Explicar qué cuentas se pasan en el Context y qué argumentos recibe.
+- **Salidas/Retornos (@return)**: Qué estado cambia en la cuenta y qué valor (si aplica) devuelve o qué error específico puede lanzar.
+
+## 3. Estrategia TDD (Test-Driven Development)
+- **Tests Primero**: Antes de implementar la lógica en Rust, escribe el test en TypeScript (usando `anchor.test.ts`) o Rust (`program-test`).
+- **Casos de Borde**: Los tests deben incluir obligatoriamente:
+    - Intentos de firma por usuarios no autorizados.
+    - Cuentas con espacio insuficiente.
+    - Desbordamientos aritméticos (Integer Overflow).
+- **Aislamiento**: Cada test debe verificar un único cambio de estado de forma atómica.
+
+## 4. Estándares de Seguridad Anchor
+- **Account Ownership**: Siempre verifica que el `owner` de las cuentas sea el programa esperado.
+- **Signers**: Verifica explícitamente quién debe firmar la transacción usando el atributo `signer`.
+- **PDA Management**: Usa siempre `find_program_address` y explica la lógica de las `seeds` elegidas en la documentación de la función.
+
+## 5. Formato de Comentarios Requerido (Ejemplo)
+```rust
+/// @notice Ejecuta el depósito de tokens en el pool.
+/// @dev Implementa lógica de transferencia y actualización de estado de PDA.
+/// @param ctx Contexto que incluye las cuentas: user, pool_state, y system_program.
+/// @param amount Cantidad exacta de lamports a depositar.
+/// @return Result<()> Retorna Ok si el depósito y la actualización de cuenta fueron exitosos.
+pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
+    // Lógica explícita aquí...
+}
