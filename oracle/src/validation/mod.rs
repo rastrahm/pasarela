@@ -25,7 +25,17 @@ pub struct CardValidationResult {
 }
 
 /// Marcas de tarjeta soportadas.
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    sqlx::Type,
+)]
+#[sqlx(type_name = "card_brand", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum CardBrand {
     Visa,

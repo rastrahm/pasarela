@@ -1,0 +1,185 @@
+# =============================================================================
+# Pasarela Multi-Rail — monorepo
+# Rust · Solana/Anchor · React/pnpm · secretos
+# =============================================================================
+
+# --- Secretos y credenciales (NUNCA commitear) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# Claves Solana / Anchor
+id.json
+*-keypair.json
+keypair.json
+.wallet
+
+# --- Rust (workspace pasarela, oracle, antifraud) ---
+# Build artifacts
+**/target/
+debug/
+release/
+
+# Backup / profiling
+**/*.rs.bk
+*.profraw
+*.profdata
+*.gcda
+*.gcno
+
+# rustfmt / clippy (salida local)
+rustfmt.toml.local
+
+# rust-analyzer / flycheck (artefactos del IDE)
+**/flycheck*
+**/.rustc_info.json
+rust-project.json
+
+# Cargo (cache local del proyecto, no el lockfile)
+.cargo/config.local.toml
+**/.cargo-ok
+
+# SQLx offline cache (regenerable; no commitear si se usa modo offline)
+**/.sqlx/
+
+# Cobertura y benchmarks Rust
+**/tarpaulin-report.html
+**/cobertura.xml
+**/criterion/
+**/flamegraph.svg
+**/perf.data*
+**/valgrind*
+
+# Nextest / insta snapshots regenerables
+**/.nextest/
+**/*.snap.new
+
+# --- Solana / Anchor (Fase 3) ---
+.anchor/
+test-ledger/
+.solana/
+programs/**/target/
+**/.crates/
+
+# Node en tests Anchor (TypeScript)
+programs/**/node_modules/
+programs/**/yarn.lock
+programs/**/package-lock.json
+
+# --- React / TypeScript / pnpm (Fase 5 — frontend y tests TS) ---
+# Dependencias
+**/node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+
+# Lockfiles alternativos (proyecto usa pnpm)
+**/package-lock.json
+**/yarn.lock
+
+# Build y bundlers
+**/dist/
+**/build/
+**/.next/
+**/.nuxt/
+**/.output/
+**/.vite/
+**/.turbo/
+**/.parcel-cache/
+**/.vercel/
+**/.netlify/
+out/
+storybook-static/
+
+# TypeScript
+**/*.tsbuildinfo
+.tscache/
+
+# Tests — Vitest / Jest / RTL
+**/coverage/
+**/.nyc_output/
+**/.vitest/
+**/test-results/
+**/__screenshots__/
+
+# Linters / formatters (cache local)
+.eslintcache
+.stylelintcache
+.prettiercache
+
+# Variables de entorno frontend (Vite expone VITE_*)
+.env.local
+.env.development.local
+.env.production.local
+.env.test.local
+
+# Logs Node
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# --- Tests E2E (Playwright) ---
+tests/e2e/test-results/
+tests/e2e/playwright-report/
+tests/e2e/blob-report/
+tests/e2e/.cache/
+
+# --- Bases de datos locales ---
+*.db
+*.sqlite
+*.sqlite3
+postgres-data/
+pgdata/
+
+# --- Logs y temporales ---
+*.log
+logs/
+tmp/
+temp/
+.cache/
+
+# --- Docker (artefactos locales, no Dockerfiles) ---
+docker-compose.override.yml
+.docker/
+
+# --- IDE / editor ---
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# VS Code — ignorar config local; mantener extensiones recomendadas si existen
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+# Cursor — estado local del IDE
+.cursor/
+
+# --- Sistema operativo ---
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# --- Build / coverage genéricos (fallback) ---
+**/coverage/
+*.lcov
+
+# --- Terraform / infra (si se añade en Fase 7/8) ---
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl

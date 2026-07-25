@@ -1,13 +1,11 @@
-//! Entrypoint del Oracle de Autorización.
+//! Entrypoint del servicio antifraude simulado.
 
 use anyhow::Context;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
-use oracle_authorization::{
-    build_app, config::AppConfig, init_database, persistence::AppState, ttl,
-};
+use antifraud_service::{build_app, config::AppConfig};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -20,24 +18,12 @@ async fn main() -> anyhow::Result<()> {
     let config = Arc::new(AppConfig::from_env().context("error cargando configuración")?);
     let listen_addr = config.listen_addr();
 
-    let pool = init_database(&config.database_url)
-        .await
-        .context("error conectando a PostgreSQL")?;
-
-    let state = AppState::new(config.clone(), pool)
-        .map_err(|err| anyhow::anyhow!("cliente antifraude: {err}"))?;
-
-    ttl::spawn_ttl_cleanup_task(
-        state.hold_store.clone(),
-        state.config.ttl_cleanup_interval_secs,
-    );
-
-    let app = build_app(state);
+    let app = build_app((*config).clone());
     let listener = TcpListener::bind(&listen_addr)
         .await
         .with_context(|| format!("no se pudo bind en {listen_addr}"))?;
 
-    tracing::info!(%listen_addr, "Oracle de autorización iniciado");
+    tracing::info!(%listen_addr, "Servicio antifraude iniciado");
 
     axum::serve(listener, app)
         .await
