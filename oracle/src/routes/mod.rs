@@ -64,7 +64,7 @@ async fn authorize(
             card: body.card,
             amount,
             currency: body.currency,
-            funding_type: body.funding_type,
+            funding_type: body.funding_type.into(),
             caller_ip,
         },
     )

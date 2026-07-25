@@ -4,26 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::AppError;
 
-/// Payload de tarjeta recibido del Gateway (datos ficticios de demo).
-#[derive(Clone, Deserialize, Serialize, PartialEq)]
-pub struct CardPayload {
-    pub pan: String,
-    pub expiry_month: String,
-    pub expiry_year: String,
-    pub cvv: String,
-    pub cardholder: String,
-}
-
-impl std::fmt::Debug for CardPayload {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        crate::logging::RedactedCard {
-            expiry_month: &self.expiry_month,
-            expiry_year: &self.expiry_year,
-            last_four: None,
-        }
-        .fmt(f)
-    }
-}
+/// Payload de tarjeta recibido del Gateway (contrato compartido en `oracle-client`).
+pub use oracle_client::CardPayload;
 
 /// Resultado de validación sin exponer el PAN completo.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]

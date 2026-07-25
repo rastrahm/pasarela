@@ -139,7 +139,7 @@ Crear la capa de dominio compartida en Rust: traits, tipos, enums y el Rail Swit
 
 | # | Paso | Detalle |
 |---|------|---------|
-| 1.1 | Inicializar workspace Cargo en raíz `pasarela/` | `Cargo.toml` workspace; **no** incluir `oracle/` |
+| 1.1 | Inicializar workspace Cargo en raíz `pasarela/` | `Cargo.toml` workspace; incluye simuladores y Oracle con reglas de deps (§4 Arquitectura) |
 | 1.2 | Crear crate `crates/domain/` | Newtypes: `TransactionId`, `Amount`, `CardNumber`, etc. |
 | 1.3 | Definir traits `PaymentProcessor` y `LiquidityEngine` | Ver [Arquitectura §5.1](./Arquitectura.md#51-traits-principales) |
 | 1.4 | Definir structs/enums de dominio | `PaymentRequest`, `CardPayload`, `FundingType`, `TransactionStatus`, `PaymentResponse` |

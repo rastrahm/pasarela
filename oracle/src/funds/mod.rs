@@ -26,6 +26,26 @@ pub enum FundingType {
     SolanaWallet,
 }
 
+impl From<oracle_client::FundingType> for FundingType {
+    fn from(value: oracle_client::FundingType) -> Self {
+        match value {
+            oracle_client::FundingType::TraditionalBank => Self::TraditionalBank,
+            oracle_client::FundingType::BinanceCex => Self::BinanceCex,
+            oracle_client::FundingType::SolanaWallet => Self::SolanaWallet,
+        }
+    }
+}
+
+impl From<FundingType> for oracle_client::FundingType {
+    fn from(value: FundingType) -> Self {
+        match value {
+            FundingType::TraditionalBank => Self::TraditionalBank,
+            FundingType::BinanceCex => Self::BinanceCex,
+            FundingType::SolanaWallet => Self::SolanaWallet,
+        }
+    }
+}
+
 /// Estado de evaluación de fondos.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct FundStatus {

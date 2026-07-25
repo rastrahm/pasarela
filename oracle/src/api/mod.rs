@@ -1,8 +1,6 @@
-//! Contrato HTTP público del Oracle — DTOs compartidos con futuro `oracle-client`.
+//! Contrato HTTP del Oracle — re-exportado desde `oracle-client` (fuente de verdad del wire format).
 
-pub mod dto;
-
-pub use dto::{
-    AuthorizeRequest, AuthorizeResponse, ErrorResponse, HealthResponse, ReleaseHoldRequest,
-    ReleaseHoldResponse,
+pub use oracle_client::{
+    error_codes, AuthorizeRequest, AuthorizeResponse, CardPayload, ErrorResponse, HealthResponse,
+    ReleaseHoldRequest, ReleaseHoldResponse,
 };

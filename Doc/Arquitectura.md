@@ -120,7 +120,19 @@ flowchart TB
 
 ## 4. Estructura de Proyectos
 
-El sistema se organiza en **tres unidades de despliegue independientes** dentro del **monorepo** `pasarela/` (decisión **D5**). El Oracle y el servicio antifraude **no forman parte** del workspace Cargo de la pasarela: cada uno tiene su propio `Cargo.toml`, ciclo de build, contenedor y secretos.
+El sistema se organiza en **tres unidades de despliegue independientes** dentro del **monorepo** `pasarela/` (decisión **D5**). Comparten workspace Cargo para DX unificada (`cargo test` en raíz), pero mantienen **fronteras lógicas y de despliegue** separadas.
+
+### Reglas de dependencia del workspace
+
+| Crate / servicio | Puede depender de | No debe depender de |
+|------------------|-------------------|---------------------|
+| `crates/domain` | (ninguna infra) | HTTP, DB, Solana, Oracle |
+| `crates/rail-switcher` | `domain` | Oracle, Gateway |
+| `crates/oracle-client` | serde, reqwest | Oracle, domain, DB |
+| `oracle/` | `oracle-client` (contrato wire) | `domain`, `rail-switcher` |
+| `antifraud/`, `binance-sim/` | Axum, serde | Gateway, domain |
+
+El contrato HTTP Gateway ↔ Oracle vive en **`crates/oracle-client/`**; el Oracle lo re-exporta en runtime vía `oracle/src/api/`.
 
 ### 4.1 Pasarela (Gateway + Dominio + On-Chain + Frontend)
 
@@ -139,7 +151,7 @@ pasarela/
 ├── tests/
 │   ├── integration/              # Tests cross-crate (Gateway ↔ mocks del Oracle)
 │   └── e2e/                      # Playwright
-├── Cargo.toml                    # Workspace root — NO incluye al Oracle
+├── Cargo.toml                    # Workspace root (domain, gateway, oracle-client, oracle, simuladores)
 ├── solana.cursorrules
 ├── rust.cursorrules
 ├── react.cursorrules
@@ -275,7 +287,7 @@ Entrada: PaymentRequest + RailPreference (opcional)
 
 ### 6.1 Oracle de Autorización (Fase 2) — Servicio independiente
 
-**Ubicación**: directorio raíz `oracle/`, fuera del workspace `pasarela/`.
+**Ubicación**: directorio raíz `oracle/`, miembro del workspace monorepo con despliegue independiente.
 
 **Responsabilidad**: simular la red procesadora (Visa/Mastercard) con validación en tiempo real (~1–3 s). Actúa como **entidad de confianza aislada**: concentra el acceso a datos sensibles de tarjeta y a las fuentes de liquidez, sin exponerse al frontend ni compartir memoria con el Gateway.
 
@@ -307,11 +319,11 @@ Entrada: PaymentRequest + RailPreference (opcional)
 
 **Stack**: Rust + **Axum** (D1), desplegado como microservicio HTTP en red privada.
 
-**Contrato con el Gateway**: el crate `pasarela/crates/oracle-client/` define los DTOs de request/response y el cliente HTTP. El Oracle implementa ese contrato; ambos evolucionan mediante versionado de API (`/internal/v1/...`), no mediante dependencias de código cruzadas.
+**Contrato con el Gateway**: el crate `pasarela/crates/oracle-client/` define los DTOs de request/response; el Oracle los **re-exporta** en `src/api/` como fuente única del wire format v1.
 
 ### 6.1.1 Servicio antifraude simulado (Fase 2)
 
-**Ubicación**: `antifraud/`, monorepo, fuera del workspace pasarela.
+**Ubicación**: `antifraud/`, monorepo, miembro del workspace con despliegue independiente.
 
 | Módulo | Función |
 |--------|---------|
