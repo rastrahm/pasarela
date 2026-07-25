@@ -3,6 +3,8 @@
 //! Ver [Casos-de-Uso UC-07](../../../Doc/Casos-de-Uso-ER-Flujos.md) y Plan §7.
 
 use anchor_lang::prelude::*;
+use anchor_lang::AccountSerialize;
+use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 pub use state::{
     find_settlement_pda, PaymentProcessed, SettlementState, SETTLEMENT_SEED,
@@ -67,20 +69,75 @@ pub mod payment_settlement {
         Ok(())
     }
 
-    /// @notice Procesa un pago on-chain transferiendo tokens SPL al comercio.
-    /// @dev Lógica de liquidación: Fase 3.4. PDA validada por seeds (Fase 3.3).
-    /// @param _ctx Cuentas SPL, PDA `SettlementState` y programas del sistema.
-    /// @param _amount Cantidad de tokens SPL a transferir.
-    /// @param _brand_code Código numérico de marca (sin PAN).
-    /// @param _settlement_rail_id Identificador del riel de liquidación.
-    /// @return Result<()> Ok tras transferencia y actualización de contadores.
-    pub fn process_payment(
-        _ctx: Context<ProcessPayment>,
-        _amount: u64,
-        _brand_code: u8,
-        _settlement_rail_id: u64,
+    /// @notice Crea PDA con espacio insuficiente — **solo tests** (TDD §7.4).
+    /// @param _ctx Pagador y merchant (seed).
+    /// @return Result<()> Ok si la cuenta queda creada con espacio reducido.
+    pub fn initialize_settlement_undersized(
+        _ctx: Context<InitializeSettlementUndersized>,
     ) -> Result<()> {
-        err!(PaymentSettlementError::NotImplemented)
+        Ok(())
+    }
+
+    /// @notice Procesa un pago on-chain transferiendo tokens SPL al comercio.
+    /// @dev Emite `PaymentProcessed` sin PII. Actualiza contadores con aritmética checked.
+    /// @param ctx Cuentas SPL, PDA `SettlementState` y token program.
+    /// @param amount Cantidad de tokens SPL a transferir (base units).
+    /// @param brand_code Código numérico de marca (sin PAN).
+    /// @param settlement_rail_id Identificador del riel de liquidación.
+    /// @return Result<()> Ok tras transferencia, contadores y evento emitidos.
+    pub fn process_payment(
+        ctx: Context<ProcessPayment>,
+        amount: u64,
+        brand_code: u8,
+        settlement_rail_id: u64,
+    ) -> Result<()> {
+        let settlement_info = ctx.accounts.settlement_state.to_account_info();
+
+        {
+            let data = settlement_info.try_borrow_data()?;
+            let state = SettlementState::try_deserialize(&mut &data[..])?;
+            require_keys_eq!(
+                state.merchant,
+                ctx.accounts.merchant.key(),
+                PaymentSettlementError::Unauthorized
+            );
+        }
+
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.payer_token_account.to_account_info(),
+                    to: ctx.accounts.merchant_token_account.to_account_info(),
+                    authority: ctx.accounts.payer.to_account_info(),
+                },
+            ),
+            amount,
+        )?;
+
+        {
+            let mut data = settlement_info.try_borrow_mut_data()?;
+            let mut state = SettlementState::try_deserialize(&mut &data[..])?;
+            state.total_amount = state
+                .total_amount
+                .checked_add(amount)
+                .ok_or(PaymentSettlementError::AmountOverflow)?;
+            state.payment_count = state
+                .payment_count
+                .checked_add(1)
+                .ok_or(PaymentSettlementError::AmountOverflow)?;
+            state.try_serialize(&mut &mut data[..])?;
+        }
+
+        let clock = Clock::get()?;
+        emit!(PaymentProcessed {
+            amount,
+            brand_code,
+            settlement_rail_id,
+            timestamp: clock.unix_timestamp,
+        });
+
+        Ok(())
     }
 }
 
@@ -107,6 +164,25 @@ pub struct InitializeSettlement<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Fixture de test: PDA con espacio menor que `SettlementState::LEN`.
+#[derive(Accounts)]
+pub struct InitializeSettlementUndersized<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: merchant pubkey usada como seed.
+    pub merchant: UncheckedAccount<'info>,
+    /// CHECK: PDA de test con espacio 16 bytes (< SettlementState::LEN).
+    #[account(
+        init,
+        payer = payer,
+        space = 16,
+        seeds = [SETTLEMENT_SEED, merchant.key().as_ref()],
+        bump,
+    )]
+    pub settlement_state: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
 /// Cuentas para ajuste de contadores en tests (Fase 3.2).
 #[derive(Accounts)]
 pub struct SetSettlementTotals<'info> {
@@ -120,32 +196,37 @@ pub struct SetSettlementTotals<'info> {
     pub settlement_state: Account<'info, SettlementState>,
 }
 
-/// Cuentas para `process_payment`.
+/// Cuentas para `process_payment` (Arquitectura §7.2).
 #[derive(Accounts)]
 pub struct ProcessPayment<'info> {
+    #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut)]
-    pub payer_token_account: Account<'info, anchor_spl::token::TokenAccount>,
-    #[account(mut)]
-    pub merchant_token_account: Account<'info, anchor_spl::token::TokenAccount>,
-    /// CHECK: merchant pubkey — seed de la PDA `SettlementState`.
-    pub merchant: UncheckedAccount<'info>,
     #[account(
         mut,
-        seeds = [SETTLEMENT_SEED, merchant.key().as_ref()],
-        bump = settlement_state.bump,
-        has_one = merchant @ PaymentSettlementError::Unauthorized,
-        constraint = settlement_state.to_account_info().data_len() >= SettlementState::LEN @ PaymentSettlementError::InsufficientAccountSpace,
+        constraint = payer_token_account.owner == payer.key() @ PaymentSettlementError::Unauthorized,
+        constraint = payer_token_account.mint == merchant_token_account.mint @ PaymentSettlementError::InvalidMint,
     )]
-    pub settlement_state: Account<'info, SettlementState>,
-    pub token_program: Program<'info, anchor_spl::token::Token>,
-    pub system_program: Program<'info, System>,
+    pub payer_token_account: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        constraint = merchant_token_account.owner == merchant.key() @ PaymentSettlementError::Unauthorized,
+    )]
+    pub merchant_token_account: Account<'info, TokenAccount>,
+    /// CHECK: merchant pubkey — seed de la PDA `SettlementState`.
+    pub merchant: UncheckedAccount<'info>,
+    /// CHECK: PDA validada por tamaño y seeds; deserializada como `SettlementState` en la instrucción.
+    #[account(
+        mut,
+        constraint = settlement_state.data_len() >= SettlementState::LEN @ PaymentSettlementError::InsufficientAccountSpace,
+        seeds = [SETTLEMENT_SEED, merchant.key().as_ref()],
+        bump,
+    )]
+    pub settlement_state: UncheckedAccount<'info>,
+    pub token_program: Program<'info, Token>,
 }
 
 #[error_code]
 pub enum PaymentSettlementError {
-    #[msg("Instruction not implemented yet (Fase 3.4)")]
-    NotImplemented,
     #[msg("Signer is not authorized for this payment")]
     Unauthorized,
     #[msg("Settlement PDA address or bump does not match merchant seeds")]

@@ -170,7 +170,6 @@ export function processPaymentAccounts(
     merchant: overrides.merchant ?? ctx.tokens.merchant.publicKey,
     settlementState: overrides.settlementState ?? ctx.settlementState,
     tokenProgram: TOKEN_PROGRAM_ID,
-    systemProgram: SystemProgram.programId,
   };
 }
 

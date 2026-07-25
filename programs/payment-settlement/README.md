@@ -42,9 +42,7 @@ programs/payment-settlement/
 cd programs/payment-settlement
 npm install
 npm run build          # SBF (v1.52) + IDL + types TS
-anchor test --skip-build   # levanta validador local + 2 tests bootstrap
-# atajo:
-npm run build && anchor test --skip-build
+npm test                 # build + deploy + 12 tests
 ```
 
 ## Clusters (D2)
@@ -58,12 +56,16 @@ Program ID (local/devnet scaffold): `4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564
 
 ## Próximos pasos (Plan §7)
 
+### Estado tests (3.4)
+
+`npm test` — **12/12 verdes** (bootstrap + PDA + §7.4).
+
+Instrucción principal: transferencia SPL (`token::transfer`), contadores con `checked_add`, evento `PaymentProcessed` con `Clock::unix_timestamp`.
+
 | Paso | Entregable |
 |------|------------|
-| 3.4 | Instrucción `process_payment` — hacer verde los 4 tests §7.4 |
-| 3.5 | Evento `PaymentProcessed` |
-| 3.6 | Constraints explícitos restantes en `#[derive(Accounts)]` |
-| 3.8 | `anchor test` verde |
+| 3.6 | Constraints explícitos restantes (`InvalidMint` en runtime, etc.) |
+| 3.8 | Gate CI con `anchor test` |
 
 ### PDA `SettlementState` (3.3)
 
@@ -75,19 +77,6 @@ Program ID (local/devnet scaffold): `4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564
 | `bump` | u8 | Bump canonical |
 
 Seeds: `["settlement", merchant.as_ref()]`. Tests: `tests/settlement-state.ts`.
-
-### Estado TDD (3.2)
-
-Los tests en `tests/process-payment.ts` están escritos **antes** de la lógica. Hasta 3.4–3.6 fallan con `NotImplemented` o errores de constraint pendientes:
-
-| Test §7.4 | Error actual (esperado) |
-|-----------|------------------------|
-| Firma no autorizada | `NotImplemented` → `Unauthorized` (3.6) |
-| Espacio insuficiente | `NotImplemented` → `InsufficientAccountSpace` (3.6) |
-| Overflow aritmético | `NotImplemented` → `AmountOverflow` (3.4) |
-| Transferencia OK + evento | `NotImplemented` → éxito (3.4–3.5) |
-
-Bootstrap (3.1): 2 tests verdes. PDA seeds: 1 test verde.
 
 ## Seguridad
 

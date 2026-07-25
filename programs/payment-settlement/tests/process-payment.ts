@@ -1,30 +1,23 @@
 /**
- * TDD — casos borde obligatorios (Arquitectura §7.4).
- *
- * Estado esperado tras 3.2: tests compilados; casos de `process_payment` en ROJO
- * hasta Fase 3.4 (lógica) y 3.6 (constraints).
+ * Casos borde obligatorios (Arquitectura §7.4) — verdes desde Fase 3.4.
  */
 
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import {
-  Keypair,
-  PublicKey,
-  SystemProgram,
-  Transaction,
-  sendAndConfirmTransaction,
-} from "@solana/web3.js";
+import { Keypair, SystemProgram } from "@solana/web3.js";
 import { expect } from "chai";
 import { PaymentSettlement } from "../target/types/payment_settlement";
 import { expectAnchorError, expectTxSuccess } from "./helpers/errors";
 import {
   BRAND_VISA,
   RAIL_SOLANA_WALLET,
+  createTokenFixture,
   processPaymentAccounts,
   processPaymentSigners,
   readTokenBalance,
   setupProcessPaymentContext,
+  settlementPda,
 } from "./helpers/token";
 
 describe("process_payment (TDD §7.4)", () => {
@@ -32,30 +25,6 @@ describe("process_payment (TDD §7.4)", () => {
 
   const program = anchor.workspace.paymentSettlement as Program<PaymentSettlement>;
   const provider = anchor.AnchorProvider.env();
-
-  /** Crea una cuenta demasiado pequeña para alojar `SettlementState`. */
-  async function createUndersizedSettlementAccount(
-    payer: Keypair,
-  ): Promise<PublicKey> {
-    const undersized = Keypair.generate();
-    const space = 16; // menor que SettlementState::LEN (57)
-    const lamports = await provider.connection.getMinimumBalanceForRentExemption(
-      space,
-    );
-
-    const tx = new Transaction().add(
-      SystemProgram.createAccount({
-        fromPubkey: payer.publicKey,
-        newAccountPubkey: undersized.publicKey,
-        lamports,
-        space,
-        programId: program.programId,
-      }),
-    );
-
-    await sendAndConfirmTransaction(provider.connection, tx, [payer, undersized]);
-    return undersized.publicKey;
-  }
 
   it("rejects payment signed by an unauthorized user", async () => {
     const ctx = await setupProcessPaymentContext(program, provider);
@@ -83,21 +52,37 @@ describe("process_payment (TDD §7.4)", () => {
   });
 
   it("rejects payment when settlement account has insufficient space", async () => {
-    const ctx = await setupProcessPaymentContext(program, provider);
-    const undersizedSettlement = await createUndersizedSettlementAccount(
-      ctx.tokens.payer,
+    const tokens = await createTokenFixture(provider, 1_000_000n);
+    const [settlementState] = settlementPda(
+      program.programId,
+      tokens.merchant.publicKey,
     );
+
+    await program.methods
+      .initializeSettlementUndersized()
+      .accountsPartial({
+        payer: tokens.payer.publicKey,
+        merchant: tokens.merchant.publicKey,
+        settlementState,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([tokens.payer])
+      .rpc();
+
+    const ctx = {
+      program,
+      provider,
+      tokens,
+      settlementState,
+      settlementBump: 0,
+    };
 
     const amount = new anchor.BN(50_000);
 
     try {
       await program.methods
         .processPayment(amount, BRAND_VISA, RAIL_SOLANA_WALLET)
-        .accounts(
-          processPaymentAccounts(ctx, {
-            settlementState: undersizedSettlement,
-          }),
-        )
+        .accounts(processPaymentAccounts(ctx))
         .signers(processPaymentSigners(ctx))
         .rpc();
       expect.fail("expected InsufficientAccountSpace");
