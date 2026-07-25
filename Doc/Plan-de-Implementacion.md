@@ -12,8 +12,8 @@
 | **Objetivo** | Procesador de pagos con tarjeta y liquidación mutable en tres rieles (Banco, Binance CEX, Solana) |
 | **Enfoque** | Desarrollo secuencial por fases; confirmación explícita antes de avanzar |
 | **Unidades de despliegue** | `pasarela/` + `oracle/` + `antifraud/` (monorepo D5) |
-| **Fase actual** | **Fase 3 — Solana/Anchor** *(3.4 cerrada 2026-07-25)* |
-| **Próximo hito** | 3.6 constraints restantes + 3.8 gate `anchor test` verde en CI |
+| **Fase actual** | **Fase 3 — Solana/Anchor** *(3.6 cerrada 2026-07-25)* |
+| **Próximo hito** | 3.8 gate `anchor test` + 3.9 devnet opcional |
 
 ### Estado actual del repositorio
 
@@ -229,8 +229,8 @@ Programa Anchor `payment-settlement` con instrucción `process_payment`, transfe
 | 3.3 | Definir `SettlementState` PDA | ✅ Seeds `["settlement", merchant]`, init + 6 tests PDA |
 | 3.4 | Implementar `process_payment` | ✅ Transfer SPL + contadores PDA + evento |
 | 3.5 | Emitir evento `PaymentProcessed` | ✅ Sin PII (incluido en 3.4) |
-| 3.6 | Validaciones `#[derive(Accounts)]` explícitas | `signer`, `owner`, `seeds`, `bump`, mint |
-| 3.7 | Errores personalizados `#[error_code]` | Overflow, unauthorized, invalid mint |
+| 3.6 | Validaciones `#[derive(Accounts)]` explícitas | ✅ signer, owner, seeds, bump, mint, balance |
+| 3.7 | Errores personalizados `#[error_code]` | ✅ Unauthorized, InvalidMint, AmountOverflow, etc. |
 | 3.8 | Ejecutar `anchor test` en local validator | Suite verde |
 | 3.9 | Desplegar en devnet (opcional MVP) | Registrar program ID |
 | 3.10 | Documentar instrucciones con `@notice/@param/@return` | Por cada instrucción pública |

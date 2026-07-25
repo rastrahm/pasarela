@@ -56,16 +56,26 @@ Program ID (local/devnet scaffold): `4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564
 
 ## Próximos pasos (Plan §7)
 
-### Estado tests (3.4)
+### Estado tests (3.6)
 
-`npm test` — **12/12 verdes** (bootstrap + PDA + §7.4).
+`npm test` — **17/17 verdes** (bootstrap + PDA + §7.4 + constraints 3.6).
 
-Instrucción principal: transferencia SPL (`token::transfer`), contadores con `checked_add`, evento `PaymentProcessed` con `Clock::unix_timestamp`.
+| Constraint | Cuenta | Error |
+|------------|--------|-------|
+| `Signer` | `payer` | — |
+| `owner == payer` | `payer_token_account` | `Unauthorized` |
+| `mint` igual | payer ↔ merchant ATA | `InvalidMint` |
+| `amount >= payment` | `payer_token_account` | `InsufficientFunds` |
+| `amount > 0` | instrucción | `InvalidAmount` |
+| `owner == merchant` | `merchant_token_account` | `Unauthorized` |
+| `seeds + bump` | `settlement_state` PDA | `ConstraintSeeds` / `InvalidSettlementPda` |
+| espacio mínimo | `settlement_state` | `InsufficientAccountSpace` |
+| merchant en PDA | `settlement_state` | `Unauthorized` |
 
 | Paso | Entregable |
 |------|------------|
-| 3.6 | Constraints explícitos restantes (`InvalidMint` en runtime, etc.) |
 | 3.8 | Gate CI con `anchor test` |
+| 3.9 | Devnet opcional |
 
 ### PDA `SettlementState` (3.3)
 
