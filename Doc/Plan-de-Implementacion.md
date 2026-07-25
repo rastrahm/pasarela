@@ -11,9 +11,9 @@
 |-------|-------|
 | **Objetivo** | Procesador de pagos con tarjeta y liquidación mutable en tres rieles (Banco, Binance CEX, Solana) |
 | **Enfoque** | Desarrollo secuencial por fases; confirmación explícita antes de avanzar |
-| **Unidades de despliegue** | `pasarela/` (Gateway, dominio, on-chain, frontend) + `oracle/` (servicio independiente) |
-| **Fase actual** | **Fase 0 — Planificación** (en curso / casi cerrada) |
-| **Próximo hito** | Cierre formal de Fase 0 → inicio Fase 1 (dominio Rust) |
+| **Unidades de despliegue** | `pasarela/` + `oracle/` + `antifraud/` (monorepo D5) |
+| **Fase actual** | **Fase 1 — Dominio** *(Fase 0 cerrada 2026-07-25)* |
+| **Próximo hito** | Workspace Cargo + crates `domain` y `rail-switcher` |
 
 ### Estado actual del repositorio
 
@@ -74,7 +74,7 @@ Estas reglas provienen de los `.cursorrules` y de [Arquitectura.md §2](./Arquit
 
 ---
 
-## 4. Fase 0 — Planificación *(fase actual)*
+## 4. Fase 0 — Planificación ✅ *(cerrada 2026-07-25)*
 
 ### Objetivo
 
@@ -90,18 +90,27 @@ Definir qué se construye, cómo se descompone, qué restricciones aplican y có
 | 0.4 | Definir Oracle como servicio independiente (`oracle/`) | ✅ | Arquitectura |
 | 0.5 | Crear esqueleto del Oracle con auth y validación base | ✅ | Dev |
 | 0.6 | Elaborar plan de implementación (este documento) | ✅ | Arquitectura |
-| 0.7 | **Resolver decisiones de diseño prioritarias** (ver §12 Arquitectura) | ⬜ | Producto + Arquitectura |
-| 0.8 | Validar y aprobar documentación (gate Fase 0) | ⬜ | Stakeholder |
+| 0.7 | **Resolver decisiones de diseño prioritarias** (ver §12 Arquitectura) | ✅ | Producto + Arquitectura |
+| 0.8 | Validar y aprobar documentación (gate Fase 0) | ✅ | Stakeholder |
 
-### Decisiones a cerrar antes de Fase 1
+### Decisiones cerradas (2026-07-25)
 
-| # | Decisión | Opciones | Recomendación MVP |
-|---|----------|----------|-------------------|
-| D1 | Framework HTTP Rust | Axum / Actix-Web | **Axum** (ya usado en Oracle) |
-| D2 | Red Solana desarrollo | local validator / devnet | **local validator** + devnet para CI |
-| D3 | Política de fallback de riel | manual / automático por prioridad | **Automático** con lista configurable |
-| D4 | Spread buffer Binance | % fijo | **2%** (coherente con código Oracle) |
-| D5 | Repositorio Oracle | monorepo / repo separado | **Monorepo** (`oracle/` en pasarela) |
+| # | Decisión | Resolución |
+|---|----------|------------|
+| D1 | Framework HTTP Rust | **Axum** (Gateway + Oracle) |
+| D2 | Red Solana desarrollo | **Local validator** + **devnet** en CI |
+| D3 | Política de fallback de riel | **Automático** por prioridad configurable |
+| D4 | Spread buffer Binance | **Configurable** vía `BINANCE_SPREAD_BUFFER_PCT` (env) |
+| D5 | Repositorio Oracle | **Monorepo** (`oracle/` en pasarela) |
+| D6 | Tokenización PAN | **Hash en memoria**; PAN descartado post-Luhn |
+| D7 | mTLS | **Fase 7/8**; MVP con X-API-KEY + allowlist |
+| D8 | 3-D Secure | **Post-MVP** (fuera de scope) |
+| D9 | Idempotency-Key | **Fase 4** (Gateway) |
+| D10 | Commitment Solana | **`finalized`** |
+| D11 | Antifraude | **Servicio externo simulado** (`antifraud/`) |
+| D12 | Auth comercio | **API key por comercio** en Fase 4 |
+
+Detalle e implicaciones: [Arquitectura §12](./Arquitectura.md#12-decisiones-de-diseño--resueltas-fase-0).
 
 ### Entregables Fase 0
 
@@ -110,13 +119,13 @@ Definir qué se construye, cómo se descompone, qué restricciones aplican y có
 - [x] `Doc/Casos-de-Uso-ER-Flujos.md`
 - [x] `Doc/Plan-de-Implementacion.md` (este archivo)
 - [x] `oracle/` — esqueleto funcional
-- [ ] Acta de aprobación / confirmación para iniciar Fase 1
+- [x] [Acta-Cierre-Fase-0.md](./Acta-Cierre-Fase-0.md) — gate 0.8
 
 ### Criterios de aceptación (gate)
 
-- [ ] Documentación revisada y coherente entre sí
-- [ ] Decisiones D1–D5 registradas en Arquitectura §12 o ADR breve
-- [ ] Confirmación explícita del stakeholder para avanzar
+- [x] Documentación revisada y coherente entre sí
+- [x] Decisiones D1–D12 registradas en Arquitectura §12
+- [x] Confirmación explícita del stakeholder para avanzar (2026-07-25)
 
 ---
 
@@ -179,7 +188,7 @@ Esqueleto existente con: auth middleware, Luhn, fondos simulados, endpoints `/in
 | 2.4 | Completar `POST /internal/v1/hold/release` | Liberación real en DB |
 | 2.5 | Implementar rate limiting completo | Ventana deslizante por API key + IP |
 | 2.6 | Integrar consultas reales/simuladas por riel | Banco ficticio, Binance simulada, RPC Solana |
-| 2.7 | Reglas antifraude básicas | Monto máximo, velocity por tarjeta tokenizada |
+| 2.7 | Integrar servicio antifraude simulado | Consulta a `antifraud/` antes del hold; fail closed si no responde |
 | 2.8 | Logging estructurado sin PII | `tracing` con campos permitidos |
 | 2.9 | Ampliar tests de seguridad | Allowlist IP, rate limit, fail closed |
 | 2.10 | Crear crate `pasarela/crates/oracle-client/` | DTOs + cliente HTTP tipado (contrato compartido) |
@@ -255,17 +264,18 @@ Backend principal: recibe checkout, orquesta Oracle, ejecuta settlement en el ri
 | 4.1 | Crear crate `crates/settlement-adapters/` | Strategy por riel: Bank, Binance, Solana |
 | 4.2 | Implementar adapter `TraditionalBank` | Generación ISO 20022 / ACH simulado |
 | 4.3 | Implementar adapter `BinanceCex` | API simulada + spread buffer |
-| 4.4 | Implementar adapter `SolanaWallet` | `solana-client` → `process_payment` |
+| 4.4 | Implementar adapter `SolanaWallet` | `solana-client` → `process_payment`; esperar commitment **`finalized`** |
 | 4.5 | Crear crate `crates/api-gateway/` | Axum, config, routes |
 | 4.6 | Implementar `POST /api/v1/checkout` | Orquestador completo |
 | 4.7 | Integrar `rail-switcher` + `oracle-client` | Selección de riel + autorización |
 | 4.8 | Implementar `GET /api/v1/transactions/{id}` | Consulta de estado (UC-09) |
 | 4.9 | Mapeo de errores HTTP | 200, 402, 422, 401, 503, 500 (§6.2) |
-| 4.10 | Idempotencia (`Idempotency-Key`) | Evitar doble cargo |
-| 4.11 | Persistencia Gateway | TRANSACTION, SETTLEMENT, GATEWAY_AUDIT_LOG |
-| 4.12 | Liberar hold en Oracle si settlement falla | `POST /internal/v1/hold/release` |
-| 4.13 | Tests de integración | Gateway + mock Oracle + mock rieles |
-| 4.14 | Dockerfile para Gateway | Imagen independiente del Oracle |
+| 4.10 | Idempotencia (`Idempotency-Key`) | Obligatorio (decisión D9); evitar doble cargo |
+| 4.11 | Auth API key por comercio | Decisión D12: `sk_test_...` / `sk_live_...` |
+| 4.12 | Persistencia Gateway | TRANSACTION, SETTLEMENT, GATEWAY_AUDIT_LOG, MERCHANT |
+| 4.13 | Liberar hold en Oracle si settlement falla | `POST /internal/v1/hold/release` |
+| 4.14 | Tests de integración | Gateway + mock Oracle + mock rieles |
+| 4.15 | Dockerfile para Gateway | Imagen independiente del Oracle |
 
 ### Flujo a validar
 
@@ -585,6 +595,6 @@ Cada transición requiere **confirmación explícita** (según Contexto General)
 
 ## 17. Próxima acción inmediata
 
-1. **Cerrar Fase 0**: resolver decisiones D1–D5 y obtener confirmación para Fase 1.  
-2. **Iniciar Fase 1**: crear workspace Cargo en `pasarela/` con crates `domain` y `rail-switcher`.  
-3. **En paralelo (opcional)**: continuar Fase 2 en `oracle/` (persistencia de holds) si el contrato de dominio ya está claro.
+1. ~~**Cerrar Fase 0**~~ ✅ Ver [Acta-Cierre-Fase-0.md](./Acta-Cierre-Fase-0.md).
+2. **Iniciar Fase 1**: crear workspace Cargo en `pasarela/` con crates `domain` y `rail-switcher`.
+3. **En paralelo (opcional)**: continuar Fase 2 en `oracle/` (persistencia, antifraud client) tras contrato de dominio.
