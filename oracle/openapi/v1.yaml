@@ -15,7 +15,7 @@ servers:
   - url: http://localhost:8081
     description: Desarrollo local
   - url: http://oracle:8081
-    description: Red Docker interna
+    description: Red interna (staging/producción)
 
 tags:
   - name: public

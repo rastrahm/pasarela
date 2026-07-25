@@ -152,7 +152,6 @@ pasarela/
 oracle/                           # Fase 2 — Axum (D1)
 ├── Cargo.toml
 ├── .env.example
-├── Dockerfile
 ├── src/
 │   ├── main.rs
 │   ├── config.rs
@@ -172,7 +171,6 @@ oracle/                           # Fase 2 — Axum (D1)
 antifraud/                        # Fase 2 — microservicio simulado (D11)
 ├── Cargo.toml                    # Proyecto Rust autónomo — Axum (D1)
 ├── .env.example
-├── Dockerfile
 ├── src/
 │   ├── main.rs
 │   ├── routes/                   # POST /internal/v1/score
@@ -628,7 +626,7 @@ El Oracle concentra datos sensibles (PAN en tránsito, evaluación de liquidez) 
 
 | Control | Referente real | Implementación MVP |
 |---------|---------------|-------------------|
-| **Aislamiento de red** | CDE separada de DMZ pública | Oracle solo en red interna (Docker/VPC); frontend **nunca** lo contacta |
+| **Aislamiento de red** | CDE separada de DMZ pública | Oracle solo en red interna (VPC); frontend **nunca** lo contacta |
 | **Autenticación mutua** | mTLS entre adquirente y procesador | `X-API-KEY` (`ORACLE_API_KEY`); producción: mTLS adicional |
 | **Allowlist de origen** | IP fija del Gateway en contrato comercial | Middleware `ORACLE_ALLOWED_CALLERS` |
 | **Superficie mínima** | Solo APIs de autorización; sin admin público | Rutas `/internal/v1/`; `GET /health` sin PII |
@@ -640,7 +638,7 @@ El Oracle concentra datos sensibles (PAN en tránsito, evaluación de liquidez) 
 | **Logs seguros** | PCI: prohibido loguear PAN/CVV | Solo `request_id`, marca, monto, riel, resultado |
 | **Timeouts estrictos** | SLA procesador ~2–3 s | Timeout por consulta RPC/CEX |
 | **Fail closed** | Estándar industria: decline si hay duda | `401`/`403`/`422` inmediato; nunca autorizar por defecto |
-| **Despliegue independiente** | Procesador en infra distinta al merchant | Imagen Docker y CI separados del Gateway |
+| **Despliegue independiente** | Procesador en infra distinta al merchant | Binario y CI separados del Gateway |
 
 ```mermaid
 flowchart TD

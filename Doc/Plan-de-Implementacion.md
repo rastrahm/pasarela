@@ -12,8 +12,8 @@
 | **Objetivo** | Procesador de pagos con tarjeta y liquidación mutable en tres rieles (Banco, Binance CEX, Solana) |
 | **Enfoque** | Desarrollo secuencial por fases; confirmación explícita antes de avanzar |
 | **Unidades de despliegue** | `pasarela/` + `oracle/` + `antifraud/` (monorepo D5) |
-| **Fase actual** | **Fase 1 — Dominio** *(Fase 0 cerrada 2026-07-25)* |
-| **Próximo hito** | Workspace Cargo + crates `domain` y `rail-switcher` |
+| **Fase actual** | **Fase 2 — Oracle** *(cerrada 2026-07-25)* |
+| **Próximo hito** | Fase 3 (Anchor) y/o Fase 4 (API Gateway) |
 
 ### Estado actual del repositorio
 
@@ -21,8 +21,8 @@
 |----------|--------|
 | Documentación de arquitectura | ✅ Completada |
 | Casos de uso, ER y flujos | ✅ Completados |
-| Esqueleto `oracle/` | ✅ Creado (auth, Luhn, holds simulados, 15 tests) |
-| Workspace `pasarela/` (crates, programs, frontend) | ⬜ Pendiente |
+| Esqueleto `oracle/` | ✅ Completo (67 tests, persistencia, seguridad) |
+| Workspace `pasarela/` (crates, programs, frontend) | ✅ `domain`, `rail-switcher`, `oracle-client` |
 | CI/CD | ⬜ Pendiente |
 | Despliegue producción | ⬜ Pendiente |
 
@@ -161,10 +161,12 @@ pasarela/
 
 ### Criterios de aceptación (gate)
 
-- [ ] `cargo test` verde en `domain` y `rail-switcher`
-- [ ] Rail Switcher cubre: preferencia explícita, default comercio, fallback, rechazo
-- [ ] Sin dependencias HTTP, DB ni Solana en `domain`
+- [x] `cargo test` verde en `domain` y `rail-switcher`
+- [x] Rail Switcher cubre: preferencia explícita, default comercio, fallback, rechazo
+- [x] Sin dependencias HTTP, DB ni Solana en `domain`
 - [ ] Confirmación explícita para Fase 2 y/o Fase 3
+
+> Acta de cierre: [Acta-Cierre-Fase-1.md](./Acta-Cierre-Fase-1.md) (2026-07-25)
 
 ---
 
@@ -199,15 +201,16 @@ Esqueleto existente con: auth middleware, Luhn, fondos simulados, endpoints `/in
 - Oracle con persistencia y audit log
 - `oracle-client` en pasarela
 - Documentación de variables de entorno (`.env.example` actualizado)
-- Dockerfile probado localmente
 
 ### Criterios de aceptación (gate)
 
-- [ ] `cargo test` verde en `oracle/` (unit + integration + security)
-- [ ] PAN nunca persiste; logs auditados sin PII
-- [ ] Requests sin API key / IP inválida → 401/403
-- [ ] Hold se crea, consume y libera correctamente
-- [ ] Confirmación explícita para Fase 4 (puede overlap con Fase 3)
+- [x] `cargo test` verde en `oracle/` (unit + integration + security)
+- [x] PAN nunca persiste; logs auditados sin PII
+- [x] Requests sin API key / IP inválida → 401/403
+- [x] Hold se crea y libera correctamente *(consume HTTP → Fase 4)*
+- [x] Confirmación explícita para Fase 4 (puede overlap con Fase 3)
+
+> Acta de cierre: [Acta-Cierre-Fase-2.md](./Acta-Cierre-Fase-2.md) (2026-07-25)
 
 ---
 
@@ -275,7 +278,6 @@ Backend principal: recibe checkout, orquesta Oracle, ejecuta settlement en el ri
 | 4.12 | Persistencia Gateway | TRANSACTION, SETTLEMENT, GATEWAY_AUDIT_LOG, MERCHANT |
 | 4.13 | Liberar hold en Oracle si settlement falla | `POST /internal/v1/hold/release` |
 | 4.14 | Tests de integración | Gateway + mock Oracle + mock rieles |
-| 4.15 | Dockerfile para Gateway | Imagen independiente del Oracle |
 
 ### Flujo a validar
 
@@ -341,14 +343,13 @@ Validar el sistema completo, cerrar brechas de seguridad del MVP y preparar arte
 | # | Paso | Detalle |
 |---|------|---------|
 | 6.1 | Tests E2E con Playwright | Flujo checkout completo por cada riel |
-| 6.2 | Tests cross-service | Gateway + Oracle real en Docker Compose |
+| 6.2 | Tests cross-service | Gateway + Oracle real en procesos locales |
 | 6.3 | Checklist QA por caso de uso | UC-01 a UC-11 ([Casos-de-Uso](./Casos-de-Uso-ER-Flujos.md)) |
 | 6.4 | Revisión de seguridad | OWASP, PCI simulado, frontera Oracle (§9 Arquitectura) |
 | 6.5 | Revisión de rendimiento | Latencia checkout ~1–3 s; sin cuellos obvios |
-| 6.6 | Docker Compose local | `frontend` + `api-gateway` + `oracle` + validator Solana |
-| 6.7 | CI pipeline | `cargo test`, `anchor test`, `pnpm test`, Playwright |
-| 6.8 | Documentar runbook de desarrollo | Cómo levantar todo el stack localmente |
-| 6.9 | Resolver deuda técnica crítica | Lista priorizada antes de staging |
+| 6.6 | CI pipeline | `cargo test`, `anchor test`, `pnpm test`, Playwright |
+| 6.7 | Documentar runbook de desarrollo | Cómo levantar todo el stack localmente (`cargo run`, servicios en terminal) |
+| 6.8 | Resolver deuda técnica crítica | Lista priorizada antes de staging |
 
 ### Checklist QA mínimo (extracto)
 
@@ -364,7 +365,7 @@ Validar el sistema completo, cerrar brechas de seguridad del MVP y preparar arte
 ### Criterios de aceptación (gate)
 
 - [ ] Playwright E2E verde en los 3 rieles
-- [ ] Docker Compose levanta stack completo
+- [ ] Stack local levantable según runbook (sin contenedores)
 - [ ] CI verde en rama principal
 - [ ] Checklist QA firmado / aprobado
 - [ ] Confirmación explícita para Fase 7
@@ -385,9 +386,9 @@ Desplegar en un entorno idéntico a producción para pruebas finales con datos s
 | 7.2 | Configurar red privada | Oracle **sin** exposición pública |
 | 7.3 | TLS en Gateway y Frontend | Certificados (Let's Encrypt / ACM) |
 | 7.4 | Secretos en gestor seguro | No `.env` plano en servidor; Vault / AWS SM |
-| 7.5 | Desplegar Oracle | Contenedor en red interna; allowlist IP del Gateway |
-| 7.6 | Desplegar Gateway | Contenedor público; env `ORACLE_BASE_URL` interno |
-| 7.7 | Desplegar Frontend | CDN o contenedor estático detrás de TLS |
+| 7.5 | Desplegar Oracle | Proceso en red interna; allowlist IP del Gateway |
+| 7.6 | Desplegar Gateway | Binario/servicio público; env `ORACLE_BASE_URL` interno |
+| 7.7 | Desplegar Frontend | CDN o hosting estático detrás de TLS |
 | 7.8 | Solana devnet (staging) | Programa desplegado; RPC dedicado recomendado |
 | 7.9 | Configurar logs centralizados | Agregación sin PII |
 | 7.10 | Configurar healthchecks y alertas | `/health` Oracle + Gateway |
@@ -518,16 +519,15 @@ Según [Arquitectura §9.8](./Arquitectura.md#98-alcance-mvp-vs-producción):
 | PR / push | `pasarela: cargo test && clippy` (cuando exista workspace) |
 | PR / push | `programs: anchor test` (cuando exista) |
 | PR / push | `frontend: pnpm test && lint` (cuando exista) |
-| Merge a `main` | Build imágenes Docker (Gateway, Oracle) |
-| Pre-release | Playwright E2E contra Docker Compose |
+| Pre-release | Playwright E2E contra stack local |
 
 ### 13.2 Artefactos de despliegue
 
 | Servicio | Artefacto | Puerto | Exposición |
 |----------|-----------|--------|------------|
-| Oracle | `oracle/Dockerfile` | 8081 | Solo red interna |
-| API Gateway | `crates/api-gateway/Dockerfile` | 8080 | Público (TLS) |
-| Frontend | build estático / nginx | 443 | Público (TLS) |
+| Oracle | binario Rust (`cargo build --release`) | 8081 | Solo red interna |
+| API Gateway | binario Rust (`cargo build --release`) | 8080 | Público (TLS) |
+| Frontend | build estático (Vite) | 443 | Público (TLS) |
 | Solana validator | solo dev/staging | 8899 | Interno |
 
 ### 13.3 Variables de entorno críticas

@@ -1,0 +1,13 @@
+[package]
+name = "rail-switcher"
+version = "0.1.0"
+edition = "2021"
+description = "Motor de decisión de riel — preferencia, disponibilidad, costo y fallback"
+publish = false
+
+[dependencies]
+domain = { path = "../domain" }
+rust_decimal = { version = "1", features = ["serde-with-str"] }
+
+[dev-dependencies]
+rust_decimal = { version = "1", features = ["serde-with-str"] }

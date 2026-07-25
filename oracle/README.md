@@ -134,11 +134,11 @@ Módulo: `src/logging/` · Detector PII: `contains_forbidden_pii()`.
 ## Despliegue
 
 ```bash
-docker build -t oracle-authorization .
-docker run --env-file .env -p 8081:8081 oracle-authorization
+cp .env.example .env   # editar variables
+cargo run --release
 ```
 
-En producción, conectar el contenedor solo a la red Docker/VPC del Gateway.
+En producción, ejecutar el binario solo en red interna accesible por el Gateway (allowlist IP / VPC).
 
 ## Relación con la pasarela
 
