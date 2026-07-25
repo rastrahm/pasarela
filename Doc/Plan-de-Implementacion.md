@@ -12,8 +12,8 @@
 | **Objetivo** | Procesador de pagos con tarjeta y liquidación mutable en tres rieles (Banco, Binance CEX, Solana) |
 | **Enfoque** | Desarrollo secuencial por fases; confirmación explícita antes de avanzar |
 | **Unidades de despliegue** | `pasarela/` + `oracle/` + `antifraud/` (monorepo D5) |
-| **Fase actual** | **Fase 3 — Solana/Anchor** *(3.8 cerrada 2026-07-25)* |
-| **Próximo hito** | Gate Fase 3 (acta) + 3.9 devnet opcional |
+| **Fase actual** | **Fase 3 — Solana/Anchor** *(3.9 devnet cerrada 2026-07-25)* |
+| **Próximo hito** | Gate Fase 3 (acta) + paso 3.10 documentación |
 
 ### Estado actual del repositorio
 
@@ -22,7 +22,7 @@
 | Documentación de arquitectura | ✅ Completada |
 | Casos de uso, ER y flujos | ✅ Completados |
 | Esqueleto `oracle/` | ✅ Completo (67 tests, persistencia, seguridad) |
-| Workspace `pasarela/` (crates, programs, frontend) | ✅ `domain`, `rail-switcher`, `oracle-client`; scaffold `programs/payment-settlement/` |
+| Workspace `pasarela/` (crates, programs, frontend) | ✅ `domain`, `rail-switcher`, `oracle-client`; `programs/payment-settlement/` en devnet |
 | CI/CD | ⬜ Pendiente (Rust) · ✅ `programs-anchor-test` workflow |
 | Despliegue producción | ⬜ Pendiente |
 
@@ -232,7 +232,7 @@ Programa Anchor `payment-settlement` con instrucción `process_payment`, transfe
 | 3.6 | Validaciones `#[derive(Accounts)]` explícitas | ✅ signer, owner, seeds, bump, mint, balance |
 | 3.7 | Errores personalizados `#[error_code]` | ✅ Unauthorized, InvalidMint, AmountOverflow, etc. |
 | 3.8 | Ejecutar `anchor test` en local validator | ✅ 17/17 verdes + workflow CI |
-| 3.9 | Desplegar en devnet (opcional MVP) | Registrar program ID |
+| 3.9 | Desplegar en devnet (opcional MVP) | ✅ Program ID `4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564B` — ver `deploy/devnet.json` |
 | 3.10 | Documentar instrucciones con `@notice/@param/@return` | Por cada instrucción pública |
 
 ### Entregables
@@ -241,7 +241,8 @@ Programa Anchor `payment-settlement` con instrucción `process_payment`, transfe
 programs/payment-settlement/
 ├── programs/payment-settlement/src/lib.rs
 ├── tests/payment-settlement.ts
-└── Anchor.toml
+├── Anchor.toml
+└── deploy/devnet.json
 ```
 
 ### Criterios de aceptación (gate)
@@ -540,6 +541,7 @@ Según [Arquitectura §9.8](./Arquitectura.md#98-alcance-mvp-vs-producción):
 | Gateway | `ORACLE_API_KEY` | Misma clave que Oracle |
 | Gateway | `DATABASE_URL` | Persistencia transacciones |
 | Gateway | `SOLANA_RPC_URL` | RPC para riel Solana |
+| Gateway | `PAYMENT_SETTLEMENT_PROGRAM_ID` | Program ID Anchor (`4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564B` en devnet) |
 | Frontend | `VITE_API_BASE_URL` | URL pública del Gateway |
 
 ---

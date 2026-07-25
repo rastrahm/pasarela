@@ -61,12 +61,23 @@ Reproducir localmente el mismo gate:
 
 ## Clusters (D2)
 
-| Entorno | Uso |
-|---------|-----|
-| `localnet` | Desarrollo y `anchor test` |
-| `devnet` | CI / staging (paso 3.9 opcional) |
+| Entorno | Uso | RPC |
+|---------|-----|-----|
+| `localnet` | Desarrollo y `anchor test` | `http://127.0.0.1:8899` |
+| `devnet` | Staging / integración Gateway (3.9) | `https://api.devnet.solana.com` |
 
-Program ID (local/devnet scaffold): `4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564B`
+Program ID (localnet + devnet): `4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564B`
+
+### Devnet (paso 3.9)
+
+Desplegado el **2026-07-25**. Metadatos en [`deploy/devnet.json`](deploy/devnet.json).
+
+```bash
+npm run deploy:devnet    # build + anchor deploy --provider.cluster devnet
+npm run verify:devnet    # solana program show contra devnet
+```
+
+Variables de entorno: [`.env.example`](.env.example) (`SOLANA_RPC_URL`, `PAYMENT_SETTLEMENT_PROGRAM_ID`).
 
 ## Próximos pasos (Plan §7)
 
@@ -76,7 +87,8 @@ Program ID (local/devnet scaffold): `4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564
 
 | Paso | Entregable |
 |------|------------|
-| 3.9 | Devnet opcional |
+| 3.9 | ✅ Devnet — `deploy/devnet.json` |
+| 3.10 | Documentación `@notice/@param/@return` |
 | Gate Fase 3 | Acta de cierre + confirmación Fase 4 |
 
 ### PDA `SettlementState` (3.3)

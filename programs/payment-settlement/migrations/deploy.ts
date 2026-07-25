@@ -4,9 +4,25 @@
 
 import * as anchor from "@coral-xyz/anchor";
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const devnet = require("../deploy/devnet.json") as {
+  programId: string;
+  cluster: string;
+};
+
 module.exports = async function (provider: anchor.AnchorProvider) {
-  // Configure client to use the provider.
   anchor.setProvider(provider);
 
-  // Add your deploy script here.
+  const programId = new anchor.web3.PublicKey(devnet.programId);
+  const info = await provider.connection.getAccountInfo(programId);
+
+  if (!info?.executable) {
+    throw new Error(
+      `Programa ${devnet.programId} no encontrado en ${provider.connection.rpcEndpoint}`,
+    );
+  }
+
+  console.log(
+    `payment-settlement desplegado: ${devnet.programId} (${devnet.cluster})`,
+  );
 };

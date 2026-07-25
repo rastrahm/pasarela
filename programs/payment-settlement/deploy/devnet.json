@@ -1,0 +1,11 @@
+{
+  "cluster": "devnet",
+  "rpcUrl": "https://api.devnet.solana.com",
+  "programId": "4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564B",
+  "programDataAddress": "ExnCfB5Nn6jyk6yFs9BwufpDydmBB2upc5yEHMkrhEGm",
+  "upgradeAuthority": "9jbUzfSbDoc7hdzVD5iNDwnu9A9MMtKAkC4dQsbyPGm4",
+  "deploySignature": "41csMPxPwBAXxMNX5b9T8F7vMH6arvLJYoDu9Hpc4CDoXTkSQ8fDPrf68MgpcyLqEz6v9tBeJov9nu2oAf8a1TTB",
+  "deployedAt": "2026-07-25",
+  "slot": 478862844,
+  "dataLength": 248216
+}
