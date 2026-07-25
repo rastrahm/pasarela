@@ -1,8 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/domain",
+    "crates/rail-switcher",
+    "crates/oracle-client",
     "oracle",
     "antifraud",
     "binance-sim",
-    "crates/oracle-client",
 ]
