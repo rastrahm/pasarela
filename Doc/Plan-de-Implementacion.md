@@ -12,8 +12,8 @@
 | **Objetivo** | Procesador de pagos con tarjeta y liquidación mutable en tres rieles (Banco, Binance CEX, Solana) |
 | **Enfoque** | Desarrollo secuencial por fases; confirmación explícita antes de avanzar |
 | **Unidades de despliegue** | `pasarela/` + `oracle/` + `antifraud/` (monorepo D5) |
-| **Fase actual** | **Fase 2 — Oracle** *(cerrada 2026-07-25)* |
-| **Próximo hito** | Fase 3 (Anchor) y/o Fase 4 (API Gateway) |
+| **Fase actual** | **Fase 3 — Solana/Anchor** *(3.1 cerrada 2026-07-25)* |
+| **Próximo hito** | 3.2 tests TDD (casos borde) + PDA `SettlementState` |
 
 ### Estado actual del repositorio
 
@@ -22,7 +22,7 @@
 | Documentación de arquitectura | ✅ Completada |
 | Casos de uso, ER y flujos | ✅ Completados |
 | Esqueleto `oracle/` | ✅ Completo (67 tests, persistencia, seguridad) |
-| Workspace `pasarela/` (crates, programs, frontend) | ✅ `domain`, `rail-switcher`, `oracle-client` |
+| Workspace `pasarela/` (crates, programs, frontend) | ✅ `domain`, `rail-switcher`, `oracle-client`; scaffold `programs/payment-settlement/` |
 | CI/CD | ⬜ Pendiente |
 | Despliegue producción | ⬜ Pendiente |
 
@@ -224,7 +224,7 @@ Programa Anchor `payment-settlement` con instrucción `process_payment`, transfe
 
 | # | Paso | Detalle |
 |---|------|---------|
-| 3.1 | Inicializar proyecto Anchor en `programs/payment-settlement/` | `Anchor.toml`, estructura estándar |
+| 3.1 | Inicializar proyecto Anchor en `programs/payment-settlement/` | ✅ `Anchor.toml`, estructura estándar, bootstrap `initialize`, 2 tests TS |
 | 3.2 | Escribir tests TypeScript **antes** de la lógica | Casos borde obligatorios (§7.4 Arquitectura) |
 | 3.3 | Definir `SettlementState` PDA | Seeds: `["settlement", merchant.key()]` |
 | 3.4 | Implementar `process_payment` | Transfer SPL + actualizar contadores PDA |
