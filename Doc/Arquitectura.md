@@ -1,6 +1,7 @@
 # Arquitectura del Sistema de Pagos Multi-Rail
 
-> Documento de referencia para el diseño e implementación del procesador de pagos agnóstico Web2/Web3 descrito en [Contexto General.md](./Contexto%20General.md).
+> Documento de referencia para el diseño e implementación del procesador de pagos agnóstico Web2/Web3 descrito en [Contexto General.md](./Contexto%20General.md).  
+> **Decisiones de diseño:** [§12](#12-decisiones-de-diseño--resueltas-fase-0) (cerradas 2026-07-25) · **Plan:** [Plan-de-Implementacion.md](./Plan-de-Implementacion.md)
 
 ---
 
@@ -68,19 +69,23 @@ flowchart TB
         TxViewer["Transaction Log Viewer"]
     end
 
-    subgraph Gateway["API Gateway (Rust — Axum/Actix)"]
+    subgraph Gateway["API Gateway (Rust — Axum)"]
         Orchestrator["Orquestador de Checkout"]
         SettlementEngine["Settlement Engine"]
         RailSwitcher["Rail Switcher"]
     end
 
-    subgraph OracleDeploy["Oracle — Despliegue Independiente (directorio separado)"]
+    subgraph OracleDeploy["Oracle — oracle/ (Axum, red interna)"]
         direction TB
         Oracle["Oracle de Autorización"]
         LuhnValidator["Validador Luhn + Marca"]
         FundEvaluator["Evaluador de Fondos por Riel"]
         Oracle --> LuhnValidator
         Oracle --> FundEvaluator
+    end
+
+    subgraph AntifraudSvc["Antifraude — antifraud/ (simulado)"]
+        FraudEngine["Scoring + velocity"]
     end
 
     subgraph Rails["Rieles de Liquidación (Strategy Pattern)"]
@@ -94,9 +99,10 @@ flowchart TB
         PaymentProcessed["Event: PaymentProcessed"]
     end
 
-    Checkout -->|POST /api/v1/checkout| Orchestrator
+    Checkout -->|"POST /api/v1/checkout\n+ API key comercio"| Orchestrator
     RailSelector --> Checkout
-    Orchestrator -->|"HTTPS interno + X-API-KEY"| Oracle
+    Orchestrator -->|"HTTPS + X-API-KEY"| Oracle
+    Oracle -->|"POST /score"| FraudEngine
     Orchestrator --> RailSwitcher
     RailSwitcher --> SettlementEngine
     SettlementEngine --> BankRail
@@ -114,7 +120,7 @@ flowchart TB
 
 ## 4. Estructura de Proyectos
 
-El sistema se organiza en **dos unidades de despliegue independientes** dentro del mismo repositorio (o en repositorios separados, según evolucione el proyecto). El Oracle **no forma parte** del workspace Cargo de la pasarela: tiene su propio `Cargo.toml`, ciclo de build, contenedor y configuración de secretos.
+El sistema se organiza en **tres unidades de despliegue independientes** dentro del **monorepo** `pasarela/` (decisión **D5**). El Oracle y el servicio antifraude **no forman parte** del workspace Cargo de la pasarela: cada uno tiene su propio `Cargo.toml`, ciclo de build, contenedor y secretos.
 
 ### 4.1 Pasarela (Gateway + Dominio + On-Chain + Frontend)
 
@@ -143,58 +149,76 @@ pasarela/
 ### 4.2 Oracle de Autorización (entidad separada e independiente)
 
 ```
-oracle/                           # Directorio raíz propio — Fase 2
-├── Cargo.toml                    # Proyecto Rust autónomo (workspace de un solo crate o mini-workspace)
-├── .env.example                  # Variables locales; NUNCA commitear secretos reales
-├── Dockerfile                    # Imagen de despliegue independiente
+oracle/                           # Fase 2 — Axum (D1)
+├── Cargo.toml
+├── .env.example
+├── Dockerfile
 ├── src/
-│   ├── main.rs                   # Entrypoint del servidor HTTP
-│   ├── config.rs                 # Carga de env: API keys, allowlist, timeouts
-│   ├── auth/                     # Middleware X-API-KEY + validación de origen
-│   ├── validation/               # Luhn, detección de marca, tokenización en memoria
-│   ├── funds/                    # Evaluador de fondos por riel
-│   └── routes/                   # POST /authorize, POST /hold, GET /health
+│   ├── main.rs
+│   ├── config.rs
+│   ├── auth/                     # X-API-KEY + allowlist (MVP); mTLS Fase 7/8 (D7)
+│   ├── validation/               # Luhn, marca, token hash en memoria (D6)
+│   ├── funds/                    # Evaluador por riel; spread vía BINANCE_SPREAD_BUFFER_PCT (D4)
+│   ├── antifraud_client/         # Cliente HTTP hacia antifraud/ (D11)
+│   └── routes/
 ├── tests/
-│   ├── integration/              # Tests HTTP del servicio aislado
-│   └── security/                 # Tests de auth, rate limit, rechazo de origen
-├── rust.cursorrules              # Mismas directivas Rust del proyecto
-└── README.md                     # Cómo levantar, configurar y desplegar el Oracle
+├── rust.cursorrules
+└── README.md
 ```
 
-### 4.3 Principios de independencia
+### 4.3 Servicio antifraude simulado (entidad separada)
 
-| Aspecto | Pasarela (Gateway) | Oracle |
-|---------|-------------------|--------|
-| **Workspace Cargo** | `pasarela/Cargo.toml` | `oracle/Cargo.toml` |
-| **Build** | `cargo build` en pasarela | `cargo build` en oracle |
-| **Despliegue** | Contenedor/proceso propio | Contenedor/proceso propio |
-| **Puerto** | Público (frontend → Gateway) | **Solo red interna** (Gateway → Oracle) |
-| **Secretos** | `GATEWAY_*`, claves de riel | `ORACLE_API_KEY`, credenciales RPC/CEX |
-| **Persistencia** | Transacciones, settlements | Holds, audit log de autorización |
-| **Comunicación** | — | Contrato HTTP/JSON; sin imports directos de crates internos del Gateway |
+```
+antifraud/                        # Fase 2 — microservicio simulado (D11)
+├── Cargo.toml                    # Proyecto Rust autónomo — Axum (D1)
+├── .env.example
+├── Dockerfile
+├── src/
+│   ├── main.rs
+│   ├── routes/                   # POST /internal/v1/score
+│   └── rules/                    # Velocity, monto máximo, scoring básico
+└── tests/
+```
+
+El Oracle invoca `antifraud/` **después** de UC-11 (auth) y **antes** de crear el hold. Si el servicio no responde → **fail closed** (decline).
+
+### 4.4 Principios de independencia
+
+| Aspecto | Pasarela (Gateway) | Oracle | Antifraude |
+|---------|-------------------|--------|------------|
+| **Workspace Cargo** | `pasarela/Cargo.toml` | `oracle/Cargo.toml` | `antifraud/Cargo.toml` |
+| **Framework HTTP** | Axum (D1) | Axum (D1) | Axum (D1) |
+| **Build** | `cargo build` en pasarela | `cargo build` en oracle | `cargo build` en antifraud |
+| **Despliegue** | Contenedor propio | Contenedor propio | Contenedor propio |
+| **Puerto** | Público (frontend → Gateway) | Solo red interna | Solo red interna |
+| **Secretos** | `GATEWAY_*`, claves comercio | `ORACLE_*`, RPC/CEX | `ANTIFRAUD_*` |
+| **Persistencia** | Transacciones, settlements, merchants | Holds, audit log | Scoring log (sin PII) |
+| **Comunicación** | — | HTTP/JSON; sin imports cruzados | Solo Oracle → Antifraude |
 
 > **Regla de frontera:** el Gateway consume al Oracle exclusivamente a través del crate `oracle-client` (DTOs + cliente HTTP). Ningún otro componente — incluido el frontend — puede invocar al Oracle directamente.
 
-### 4.4 Topología de despliegue
+### 4.5 Topología de despliegue
 
 ```mermaid
 flowchart LR
     subgraph Public["Zona pública"]
         FE["frontend/"]
-        GW["api-gateway/"]
+        GW["api-gateway/\n(Axum)"]
     end
 
     subgraph Private["Zona privada — red interna"]
         OR["oracle/"]
+        AF["antifraud/"]
         Rails["Rieles externos\nBanco · Binance · Solana RPC"]
     end
 
     subgraph Chain["Blockchain"]
-        SC["programs/payment-settlement/"]
+        SC["programs/payment-settlement/\nlocal validator + devnet CI"]
     end
 
     FE -->|"HTTPS"| GW
-    GW -->|"HTTPS + X-API-KEY\n(solo allowlist)"| OR
+    GW -->|"X-API-KEY + allowlist\n(mTLS Fase 7/8)"| OR
+    OR --> AF
     GW --> Rails
     GW --> SC
     OR --> Rails
@@ -237,7 +261,7 @@ El **Rail Switcher** selecciona el riel activo según reglas de negocio configur
 1. **Preferencia explícita** del usuario/comercio (desde el frontend).
 2. **Disponibilidad** — el Oracle confirma fondos suficientes en el riel candidato.
 3. **Costo** — comisiones/spread por riel (ej. spread buffer en Binance).
-4. **Fallback** — si el riel preferido falla, intenta el siguiente en orden de prioridad.
+4. **Fallback automático** (D3) — si el riel preferido falla, intenta el siguiente según **lista de prioridad** en `RAIL_CONFIG` (no manual).
 
 ```
 Entrada: PaymentRequest + RailPreference (opcional)
@@ -260,8 +284,10 @@ Entrada: PaymentRequest + RailPreference (opcional)
 | Módulo | Función |
 |--------|---------|
 | **Validador de tarjeta** | Algoritmo de Luhn + detección de marca (Visa/MC/Amex) |
-| **Autenticación** | Middleware `X-API-KEY` + validación de IP/origen permitido |
+| **Autenticación** | Middleware `X-API-KEY` + allowlist IP (MVP); mTLS en Fase 7/8 (D7) |
+| **Cliente antifraude** | Consulta a `antifraud/` antes del hold; fail closed (D11) |
 | **Evaluador de fondos** | Lógica específica por riel (ver tabla abajo) |
+| **Tokenización** | Hash en memoria post-Luhn; PAN descartado — no persiste (D6) |
 | **Gestor de holds** | Creación, expiración y liberación de holds off-chain |
 | **Audit logger** | Registro estructurado sin PII (marca, monto, riel, resultado) |
 
@@ -270,7 +296,7 @@ Entrada: PaymentRequest + RailPreference (opcional)
 | Riel | Fuente de saldo | Lógica de hold |
 |------|-----------------|----------------|
 | TraditionalBank | Saldo bancario ficticio / límite estático | Hold sobre límite disponible |
-| BinanceCex | API simulada Spot | Hold en USDC/USDT + spread buffer de protección |
+| BinanceCex | API simulada Spot | Hold en USDC/USDT − spread buffer (`BINANCE_SPREAD_BUFFER_PCT`, D4) |
 | SolanaWallet | RPC Solana (balance on-chain) | Hold sobre balance SPL de la wallet |
 
 **Endpoints internos** (solo Gateway):
@@ -281,13 +307,30 @@ Entrada: PaymentRequest + RailPreference (opcional)
 | `POST` | `/internal/v1/hold/release` | Libera hold en caso de fallo de settlement |
 | `GET` | `/health` | Healthcheck para orquestación de contenedores |
 
-**Stack**: Rust + Axum (o Actix-Web), desplegado como microservicio HTTP en red privada.
+**Stack**: Rust + **Axum** (D1), desplegado como microservicio HTTP en red privada.
 
 **Contrato con el Gateway**: el crate `pasarela/crates/oracle-client/` define los DTOs de request/response y el cliente HTTP. El Oracle implementa ese contrato; ambos evolucionan mediante versionado de API (`/internal/v1/...`), no mediante dependencias de código cruzadas.
 
+### 6.1.1 Servicio antifraude simulado (Fase 2)
+
+**Ubicación**: `antifraud/`, monorepo, fuera del workspace pasarela.
+
+| Módulo | Función |
+|--------|---------|
+| **Scoring** | Evalúa riesgo de la transacción (monto, velocity, token hash) |
+| **Reglas** | Decline si supera umbrales configurables |
+| **API interna** | `POST /internal/v1/score` — solo Oracle |
+
+Si `antifraud/` no responde en timeout → Oracle rechaza con decline (**fail closed**, D11).
+
 ### 6.2 API Gateway y Orquestador (Fase 4)
 
-**Endpoint principal**: `POST /api/v1/checkout`
+**Endpoints principales**:
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/checkout` | API key comercio (D12) + `Idempotency-Key` (D9) | Checkout completo |
+| `GET` | `/api/v1/transactions/{id}` | API key comercio | Consulta de estado |
 
 **Flujo del orquestador:**
 
@@ -299,8 +342,10 @@ sequenceDiagram
     participant SE as Settlement Engine
     participant Rail as Riel Activo
 
-    Client->>GW: POST /api/v1/checkout
+    Client->>GW: POST /api/v1/checkout + Idempotency-Key
+    GW->>GW: Validar API key comercio (D12)
     GW->>Oracle: Autorizar + Hold preventivo
+    Oracle->>Oracle: Antifraude (D11) → Luhn → Fondos → Hold
     Oracle-->>GW: Aprobado / Rechazado
 
     alt Aprobado
@@ -318,7 +363,7 @@ sequenceDiagram
 
 | Riel | Acción de liquidación | Prueba de asentamiento |
 |------|----------------------|------------------------|
-| SolanaWallet | Invocar `process_payment` vía `solana-client` | Tx Signature (hash on-chain) |
+| SolanaWallet | Invocar `process_payment` vía `solana-client`; esperar commitment **`finalized`** (D10) | Tx Signature (hash on-chain) |
 | BinanceCex | Débito simulado API Binance custodial | ID de orden CEX |
 | TraditionalBank | Generar archivo de compensación simulado (ISO 20022 / ACH) | Referencia bancaria |
 
@@ -329,13 +374,18 @@ sequenceDiagram
 | `200` | Pago autorizado y liquidado |
 | `402` | Fondos insuficientes |
 | `422` | Tarjeta inválida (Luhn fallido) |
-| `401` | API Key inválida (Oracle) |
+| `401` | API Key inválida (Oracle / comercio) |
+| `409` | Idempotency-Key duplicada (misma respuesta cacheada) |
 | `503` | Riel no disponible / timeout RPC |
 | `500` | Error interno no recuperable |
 
 ---
 
 ## 7. Programa Solana (Fase 3)
+
+**Entorno de desarrollo** (D2): **local validator** en desarrollo diario; **devnet** en pipeline CI.
+
+**Confirmación al cliente** (D10): el Gateway no responde `200` hasta commitment **`finalized`** de la transacción Solana.
 
 ### 7.1 Instrucción principal
 
@@ -430,7 +480,7 @@ En un procesador de pagos fiat real, la seguridad no es un solo servicio: es un 
 | Estructura | Qué exige en la vida real | Rol en la pasarela |
 |------------|---------------------------|-------------------|
 | **PCI-DSS** | Nunca almacenar CVV; minimizar exposición del PAN; segmentar CDE (Cardholder Data Environment) | Oracle = zona CDE simulada; PAN solo en tránsito hacia el Oracle; sin persistencia de CVV |
-| **PSD2 / SCA** | Autenticación fuerte del titular (3-D Secure 2.x) antes de debitar | MVP: no implementado; producción: paso previo al `/authorize` vía ACS del emisor |
+| **PSD2 / SCA** | Autenticación fuerte del titular (3-D Secure 2.x) antes de debitar | **Post-MVP** (D8); sin 3DS en este proyecto |
 | **KYC / AML** | Identidad verificada del comercio y del titular; screening contra listas (OFAC, PEP) | MVP: datos ficticios; producción: integración con proveedor KYC/AML antes del checkout |
 | **Basilea / riesgo operacional** | Controles sobre fallos de liquidación, fraude y continuidad | Holds + fallback de riel + reconciliación off-chain |
 | **Auditoría (SOX, IFRS)** | Trazabilidad inmutable de autorizaciones y settlements | Audit log del Oracle + comprobantes por riel (ref. bancaria, ID CEX, Tx Signature) |
@@ -450,13 +500,13 @@ flowchart TB
     end
 
     subgraph Internal["Red interna bancaria"]
-        Fraud["Motor antifraude"]
+        Fraud["Motor antifraude\n(antifraud/)"]
         Core["Core bancario"]
         ACH["Clearing ACH / SWIFT / ISO 20022"]
     end
 
     Browser -->|TLS 1.2+| GW
-    GW -->|mTLS + API Key| Auth
+    GW -->|X-API-KEY + allowlist\n(mTLS Fase 7/8)| Auth
     Auth --> Fraud
     Auth --> TokenVault
     GW --> ACH
@@ -468,7 +518,7 @@ flowchart TB
 | **Payment Gateway (comercio)** | Recibe checkout; nunca toca el core bancario | `api-gateway/` |
 | **Authorization Host / Processor** | Valida tarjeta, consulta emisor, crea auth code | `oracle/` (simula red procesadora) |
 | **Token Vault + HSM** | Genera y resguarda tokens de PAN; claves en hardware | Tokenización en memoria en Oracle (MVP); HSM externo en producción |
-| **Motor antifraude** | Scoring, velocity checks, geolocalización, device fingerprint | MVP: reglas básicas (monto, rate limit); producción: servicio dedicado (ej. Stripe Radar, Sift) |
+| **Motor antifraude** | Scoring, velocity checks, geolocalización, device fingerprint | **`antifraud/`** microservicio simulado (D11); Oracle lo consulta pre-hold |
 | **Core bancario** | Libro mayor de cuentas; débitos/créditos definitivos | Simulado en riel `TraditionalBank` |
 | **Clearing / Settlement** | Compensación batch (T+1/T+2) vía ACH, Fedwire, SEPA, ISO 20022 | Generación de mensaje ISO 20022 / ACH simulado |
 | **Chargeback / disputas** | Reversión hasta 120 días post-transacción | MVP: `Reversed` en enum; sin flujo de disputa completo |
@@ -479,9 +529,9 @@ flowchart TB
 |---------|----------------------|-------------------|-----------------|
 | Cifrado en tránsito | TLS 1.2+ (preferible 1.3) | TLS entre FE ↔ GW ↔ Oracle | Certificados gestionados (Let's Encrypt / ACM) + HSTS |
 | Cifrado en reposo | AES-256 | No aplica (sin persistencia de PAN) | BD cifrada; columnas sensibles con envelope encryption |
-| Autenticación servicio-a-servicio | mTLS + OAuth2 client credentials | `X-API-KEY` + allowlist IP | mTLS mutuo + rotación automática de certificados |
-| Tokenización PAN | PCI token vault (format-preserving o random) | Token en memoria post-Luhn | Integración con Spreedly, Basis Theory o vault propio con HSM |
-| Idempotencia | `Idempotency-Key` en autorizaciones | Por definir en Gateway | Obligatorio para evitar doble cargo |
+| Autenticación servicio-a-servicio | mTLS + OAuth2 client credentials | MVP: `X-API-KEY` + allowlist (D7); **mTLS Fase 7/8** |
+| Tokenización PAN | PCI token vault (format-preserving o random) | Hash en memoria post-Luhn (D6); HSM post-MVP |
+| Idempotencia | `Idempotency-Key` en autorizaciones | **Fase 4** Gateway (D9) |
 | Reconciliación | Batch diario Gateway ↔ procesador ↔ banco | Log estructurado | Jobs de reconciliación + alertas de mismatch |
 | Retención de logs | 7 años (varía por jurisdicción) | Logs estructurados sin PII | SIEM + WORM storage |
 
@@ -585,8 +635,8 @@ El Oracle concentra datos sensibles (PAN en tránsito, evaluación de liquidez) 
 | **Rate limiting** | Protección contra credential stuffing / abuso | 100 req/min por API key e IP |
 | **Secretos** | HSM / AWS Secrets Manager / Vault | Variables de entorno; `.env` en `.gitignore` |
 | **Tokenización PAN** | Vault PCI nivel 1 | Token en memoria post-Luhn; PAN no persiste ni en logs |
-| **Motor antifraude** | FICO, SAS, servicios del procesador | MVP: reglas básicas; extensible a servicio externo |
-| **3-D Secure** | ACS del emisor (Visa Secure, Mastercard ID Check) | Pendiente — ver §12 |
+| **Motor antifraude** | FICO, SAS, servicios del procesador | **`antifraud/`** simulado (D11); fail closed |
+| **3-D Secure** | ACS del emisor (Visa Secure, Mastercard ID Check) | **Post-MVP** (D8) |
 | **Logs seguros** | PCI: prohibido loguear PAN/CVV | Solo `request_id`, marca, monto, riel, resultado |
 | **Timeouts estrictos** | SLA procesador ~2–3 s | Timeout por consulta RPC/CEX |
 | **Fail closed** | Estándar industria: decline si hay duda | `401`/`403`/`422` inmediato; nunca autorizar por defecto |
@@ -635,7 +685,7 @@ flowchart TD
 | IP whitelist en panel Binance | Configurable vía env |
 | HMAC-SHA256 firma de requests | Simular en adapter; obligatorio en producción |
 | 2FA en cuenta CEX | Fuera de scope MVP (operador) |
-| Spread buffer / slippage protection | Hold = monto + spread buffer |
+| Spread buffer / slippage protection | Hold = monto; saldo efectivo = balance × (1 − `BINANCE_SPREAD_BUFFER_PCT`) (D4) |
 | Prueba de pago | `orderId` o `clientOrderId` de la API |
 
 #### 9.5.3 SolanaWallet (non-custodial)
@@ -645,7 +695,7 @@ flowchart TD
 | Usuario firma con wallet (Phantom, etc.) | `payer_token_account` = signer |
 | Verificación de mint (USDC oficial) | Constraint sobre mint del SPL token |
 | PDA para estado de settlement | `settlement_state` con seeds documentadas |
-| Finality antes de confirmar al cliente | Esperar `confirmed` o `finalized` commitment |
+| Finality antes de confirmar al cliente | Esperar commitment **`finalized`** (D10) |
 | Prueba de pago | Tx Signature verificable en Solscan/Explorer |
 | Zero PII on-chain | Evento `PaymentProcessed` sin PAN ni nombre |
 
@@ -657,11 +707,11 @@ flowchart TD
 |--------|---------------|----------------|
 | PAN en tránsito | PCI: cifrado punto a punto | TLS; Gateway reenvía PAN solo al Oracle, no persiste |
 | Frontend → Oracle | Violación PCI si el browser toca la CDE | **Prohibido** — solo Gateway → Oracle |
-| Idempotencia | Stripe, Adyen exigen `Idempotency-Key` | Por implementar en Fase 4 |
+| Idempotencia | Stripe, Adyen exigen `Idempotency-Key` | **Fase 4** (D9) |
 | PII en logs | GDPR / PCI | Solo `transaction_id`, status, riel |
 | XSS / inyección | OWASP Top 10 | Zod en frontend; sanitización en Gateway |
 | CSP / CORS | Restringir orígenes del checkout | Configurar en Gateway para dominio del comercio |
-| Rutas públicas | API key del comercio (Stripe-style) | Middleware auth en Gateway |
+| Rutas públicas | API key del comercio (Stripe-style) | **`sk_test_...` / `sk_live_...`** por comercio (D12) |
 
 ---
 
@@ -683,14 +733,14 @@ flowchart TD
 | Área | MVP (este proyecto) | Producción real |
 |------|---------------------|-----------------|
 | Red procesadora | Luhn + simulación | Integración adquirente (Stripe, Adyen, Fiserv) |
-| 3-D Secure | No | ACS del emisor obligatorio en UE (PSD2) |
-| Token vault | Memoria en Oracle | HSM + vault PCI nivel 1 |
-| Antifraude | Rate limit + reglas básicas | Motor ML dedicado |
+| 3-D Secure | **Post-MVP** (D8) | ACS del emisor obligatorio en UE (PSD2) |
+| Token vault | Hash en memoria Oracle (D6) | HSM + vault PCI nivel 1 |
+| Antifraude | Servicio `antifraud/` simulado (D11) | Motor ML dedicado |
 | Core bancario | Simulado | Integración bancaria real (open banking / correspondent) |
 | CEX | API simulada | Binance API con HMAC + IP whitelist |
-| Solana | devnet/local | mainnet + auditoría de contrato + RPC dedicado |
+| Solana | local validator + devnet CI (D2) | mainnet + auditoría de contrato + RPC dedicado |
 | KYC/AML | Datos ficticios | Onfido, Sumsub, Chainalysis |
-| mTLS | Opcional (decisión pendiente) | Obligatorio entre servicios internos |
+| mTLS | Fase 7/8 (D7) | Obligatorio entre servicios internos |
 | SOC / SIEM | Logs estructurados | Datadog, Splunk, alertas 24/7 |
 
 ---
@@ -700,10 +750,11 @@ flowchart TD
 | Capa | Herramienta | Enfoque |
 |------|-------------|---------|
 | Dominio Rust | `cargo test` + `mod tests` | Traits, Rail Switcher, structs — TDD |
-| Oracle (aislado) | `oracle/tests/` | HTTP, auth, rate limit, Luhn, fondos — TDD independiente |
+| Oracle (aislado) | `oracle/tests/` | HTTP, auth, Luhn, fondos, antifraude client |
+| Antifraude | `antifraud/tests/` | Scoring, decline rules, fail closed |
 | Gateway + oracle-client | `pasarela/tests/integration/` | Gateway con mock/stub del Oracle |
 | Gateway ↔ Oracle (E2E interno) | `tests/integration/` cross-service | Contrato HTTP real entre ambos servicios |
-| Solana Program | `anchor test` (TS) + `program-test` (Rust) | Instrucciones, PDAs, eventos — TDD |
+| Solana Program | `anchor test` (TS) + `program-test` (Rust) | local validator (dev) + **devnet** (CI, D2) |
 | Frontend | Vitest + RTL | Interacción de usuario, Rail Selector |
 | E2E | Playwright | Flujo completo checkout → confirmación |
 | QA | Checklists manuales | 3+ edge cases por función, seguridad, rendimiento |
@@ -716,36 +767,83 @@ El desarrollo es **secuencial y modular**. No se avanza a la siguiente fase sin 
 
 | Fase | Nombre | Entregables clave | Dependencias |
 |------|--------|-------------------|--------------|
-| **1** | Dominio y Abstracción de Rieles | Traits, structs, enums, Rail Switcher | — |
-| **2** | Oracle de Autorización | Proyecto independiente en `oracle/`, HTTP interno, auth, validador Luhn, evaluador de fondos | Contrato de API acordado con Fase 1 (DTOs); implementación paralela posible |
-| **3** | Motor de Liquidación On-Chain | Programa Anchor, tests de integración | Fase 1 |
-| **4** | API Gateway y Orquestación | Gateway Rust, Settlement Engine, mapeo de errores | Fases 1, 2, 3 |
+| **0** | Planificación | Docs, decisiones D1–D12, esqueleto Oracle | — ✅ |
+| **1** | Dominio y Abstracción de Rieles | Traits, structs, enums, Rail Switcher (fallback D3) | Fase 0 |
+| **2** | Oracle + Antifraude | `oracle/` completo + `antifraud/` simulado (D11) | Contrato API; paralelo con Fase 3 |
+| **3** | Motor de Liquidación On-Chain | Programa Anchor; local validator + devnet CI (D2) | Fase 1 |
+| **4** | API Gateway y Orquestación | Axum Gateway, Settlement, idempotencia (D9), auth comercio (D12) | Fases 1, 2, 3 |
 | **5** | Frontend (Dashboard & Checkout) | React + Tailwind, conexión al Gateway | Fase 4 |
+| **7/8** | Staging / Producción | mTLS (D7), TLS, secretos, monitoreo | Fases 5–6 |
 
 ---
 
-## 12. Decisiones de Diseño Pendientes
+## 12. Decisiones de Diseño — Resueltas (Fase 0)
 
-Estas decisiones se resolverán al iniciar cada fase:
+> Cerradas en Fase 0 — paso 0.7 ([Plan-de-Implementacion.md](./Plan-de-Implementacion.md)).  
+> Fecha: 2026-07-25.
 
-1. **Axum vs Actix-Web** para los microservicios Rust (Gateway y Oracle pueden elegir por separado).
-2. **Formato exacto del spread buffer** en el riel BinanceCex.
-3. **Política de fallback** cuando múltiples rieles están disponibles.
-4. **Estrategia de tokenización** del PAN (en memoria en Oracle vs. vault externo con HSM simulado).
-5. **Red Solana** para desarrollo (local validator vs. devnet).
-6. **mTLS** entre Gateway y Oracle en producción (estándar real adquirente ↔ procesador).
-7. **Repositorio del Oracle**: monorepo (`oracle/` dentro de pasarela) vs. repositorio Git separado.
-8. **3-D Secure (SCA)**: simular ACS del emisor vs. integrar proveedor (Stripe 3DS2, Cardinal).
-9. **Idempotency-Key** en `POST /api/v1/checkout` (obligatorio en procesadores reales).
-10. **Commitment level Solana**: `confirmed` vs. `finalized` antes de responder éxito al cliente.
-11. **Motor antifraude**: reglas inline en Oracle vs. servicio externo simulado.
-12. **API key del comercio** en Gateway (modelo Stripe: `sk_live_...` por comercio).
+| ID | Decisión | Resolución |
+|----|----------|------------|
+| **D1** | Framework HTTP Rust | **Axum** en Gateway y Oracle |
+| **D2** | Red Solana (dev/CI) | **Local validator** en desarrollo + **devnet** en CI |
+| **D3** | Política de fallback | **Automático** por lista de prioridad configurable |
+| **D4** | Spread buffer BinanceCex | **Configurable** vía variable de entorno (`BINANCE_SPREAD_BUFFER_PCT`); sin valor fijo en código |
+| **D5** | Repositorio Oracle | **Monorepo** — `oracle/` dentro de `pasarela/` |
+| **D6** | Tokenización PAN | **Hash en memoria** en Oracle; PAN descartado tras validación Luhn (MVP) |
+| **D7** | mTLS Gateway ↔ Oracle | **MVP**: `X-API-KEY` + allowlist; **mTLS en Fase 7/8** (staging/producción) |
+| **D8** | 3-D Secure (SCA) | **Fuera de scope MVP** — documentado como post-MVP |
+| **D9** | Idempotency-Key | **Implementar en Fase 4** (Gateway), obligatorio antes de staging |
+| **D10** | Commitment level Solana | **`finalized`** antes de confirmar éxito al cliente |
+| **D11** | Motor antifraude | **Servicio externo simulado** (microservicio aparte; Oracle lo invoca) |
+| **D12** | Auth comercio en Gateway | **API key por comercio** (estilo `sk_test_...` / `sk_live_...`) en Fase 4 |
+
+### Implicaciones de las decisiones
+
+**D4 — Spread buffer configurable**
+
+```bash
+# Oracle / settlement-adapters
+BINANCE_SPREAD_BUFFER_PCT=0.02   # ejemplo: 2%; ajustable por entorno
+```
+
+**D11 — Servicio antifraude simulado**
+
+Nuevo componente opcional en arquitectura (Fase 2/4):
+
+```
+antifraud/                    # Microservicio simulado (futuro)
+├── Cargo.toml
+└── src/                      # Scoring, velocity, reglas de decline
+```
+
+El Oracle consulta al servicio antifraude **antes** de autorizar el hold. Si el servicio no responde → **fail closed** (decline).
+
+**D10 — Commitment `finalized`**
+
+El adapter Solana del Gateway esperará `finalized` antes de responder `200` al checkout. Implica mayor latencia (~15–30 s en mainnet; menor en devnet) a cambio de irreversibilidad.
+
+**D12 — API key por comercio**
+
+El Gateway validará `Authorization: Bearer sk_test_...` (o header dedicado) en `POST /api/v1/checkout`. Cada comercio tendrá clave propia en persistencia.
+
+### Decisiones post-MVP (sin cerrar aún)
+
+Estas se resolverán al abordar producción real:
+
+- Integración adquirente real (Stripe, Adyen, Fiserv)
+- Token vault con HSM / PCI nivel 1
+- 3-D Secure con ACS del emisor
+- Solana mainnet + auditoría externa del contrato
+- KYC/AML (Onfido, Sumsub, Chainalysis)
 
 ---
 
 ## Referencias
 
 - [Contexto General.md](./Contexto%20General.md) — Prompt maestro y fases del proyecto
+- [Plan-de-Implementacion.md](./Plan-de-Implementacion.md) — Hoja de ruta hasta producción
+- [Acta-Cierre-Fase-0.md](./Acta-Cierre-Fase-0.md) — Gate Fase 0 (2026-07-25)
+- [Casos-de-Uso-ER-Flujos.md](./Casos-de-Uso-ER-Flujos.md) — UC, ER y flujos operativos
 - `rust.cursorrules` — Directivas de desarrollo Rust
 - `solana.cursorrules` — Directivas Anchor y seguridad on-chain
 - `react.cursorrules` — Directivas frontend

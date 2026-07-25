@@ -1,6 +1,7 @@
 # Casos de Uso, Modelo Entidad-Relación y Flujos
 
-> Documento complementario de [Arquitectura.md](./Arquitectura.md). Describe el comportamiento funcional, el modelo de datos y los flujos operativos del sistema de pagos multi-rail.
+> Documento complementario de [Arquitectura.md](./Arquitectura.md). Describe el comportamiento funcional, el modelo de datos y los flujos operativos del sistema de pagos multi-rail.  
+> **Decisiones de diseño:** alineado con [Arquitectura §12](./Arquitectura.md#12-decisiones-de-diseño--resueltas-fase-0) (D1–D12, 2026-07-25).
 
 ---
 
@@ -11,8 +12,9 @@
 | **Comprador** | Humano | Usuario que ingresa datos de tarjeta y confirma el pago en el checkout. |
 | **Comercio** | Humano / Sistema | Entidad que recibe el pago; puede configurar preferencia de riel por defecto. |
 | **Frontend (Checkout)** | Sistema | Interfaz React que captura datos, valida con Zod y muestra el resultado. |
-| **API Gateway** | Sistema | Orquestador principal; expone `POST /api/v1/checkout` y coordina Oracle + Settlement. |
-| **Oracle de Autorización** | Sistema independiente | Servicio aislado en `oracle/`; simula red procesadora; valida tarjeta y evalúa fondos (~1–3 s). Solo accesible desde red interna por el Gateway. |
+| **API Gateway** | Sistema | Orquestador Axum (D1); expone checkout con auth comercio (D12) e idempotencia (D9). |
+| **Oracle de Autorización** | Sistema independiente | Servicio Axum en `oracle/`; simula red procesadora; solo accesible por Gateway en red interna. |
+| **Servicio Antifraude** | Sistema independiente | Microservicio simulado en `antifraud/` (D11); Oracle lo consulta pre-hold; fail closed. |
 | **Rail Switcher** | Sistema | Motor de decisión que selecciona el riel activo según reglas de negocio. |
 | **Settlement Engine** | Sistema | Ejecuta la liquidación en el riel elegido. |
 | **Riel Tradicional** | Sistema externo | Genera compensación bancaria simulada (ISO 20022 / ACH). |
@@ -34,11 +36,13 @@ flowchart LR
         Settlement --> Solana["Riel Solana"]
     end
 
-    subgraph Private["Zona privada — oracle/"]
-        Oracle["Oracle de Autorización"]
+    subgraph Private["Zona privada"]
+        Oracle["Oracle — oracle/"]
+        AF["Antifraude — antifraud/"]
     end
 
-    Gateway -->|"HTTPS + X-API-KEY\n(allowlist)"| Oracle
+    Gateway -->|"X-API-KEY + allowlist"| Oracle
+    Oracle --> AF
     Oracle --> Bank
     Oracle --> Binance
     Oracle --> Solana
@@ -74,6 +78,11 @@ flowchart TB
         UC03["UC-03: Validar tarjeta"]
         UC04["UC-04: Autorizar hold"]
         UC11["UC-11: Control de acceso"]
+        UC12["UC-12: Scoring antifraude"]
+    end
+
+    subgraph AntifraudSvc["Antifraude — antifraud/"]
+        UC12b["UC-12: Evaluar riesgo"]
     end
 
     C --> UC01
@@ -82,7 +91,8 @@ flowchart TB
     M --> UC02
     UC01 -.->|vía Gateway| UC03
     UC01 -.->|vía Gateway| UC04
-    UC03 --> UC11
+    UC03 --> UC12
+    UC12 -.-> UC12b
     UC04 --> UC11
     UC01 --> UC05
     UC01 --> UC06
@@ -102,7 +112,7 @@ flowchart TB
 | **Actor principal** | Comprador |
 | **Actores secundarios** | Frontend, API Gateway, Oracle, Settlement Engine |
 | **Descripción** | El comprador ingresa datos ficticios de tarjeta, selecciona un riel de liquidación y confirma el pago. El sistema autoriza, retiene fondos y liquida en el riel activo. |
-| **Precondiciones** | Frontend disponible; Gateway y Oracle operativos; al menos un riel configurado y habilitado. |
+| **Precondiciones** | Frontend disponible; Gateway y Oracle operativos; API key comercio válida (D12); al menos un riel habilitado. |
 | **Postcondiciones (éxito)** | Transacción en estado `Settled`; comprobante generado (Tx Signature, ID CEX o ref. bancaria). |
 | **Postcondiciones (fallo)** | Transacción en estado `Failed`; hold liberado si existía. |
 
@@ -110,10 +120,10 @@ flowchart TB
 
 1. El comprador ingresa monto, datos de tarjeta y selecciona riel (UC-02).
 2. El frontend valida localmente con Zod.
-3. El frontend envía `POST /api/v1/checkout`.
-4. El Gateway invoca UC-03 (validar tarjeta) vía `oracle-client` → `POST /internal/v1/authorize`.
-5. El Gateway invoca UC-04 (autorizar hold) en la misma llamada al Oracle (UC-11 valida acceso antes de procesar).
-6. El Gateway ejecuta liquidación según riel: UC-05, UC-06 o UC-07.
+3. El frontend envía `POST /api/v1/checkout` con header `Authorization: Bearer sk_test_...` (D12).
+4. El Gateway valida API key del comercio e `Idempotency-Key` (D9).
+5. El Gateway invoca UC-03 + UC-04 + UC-12 vía `oracle-client` → `POST /internal/v1/authorize`.
+6. El Gateway ejecuta liquidación según riel: UC-05, UC-06 o UC-07 (Solana espera `finalized`, D10).
 7. El Gateway responde con `transaction_id`, `status` y `settlement_proof`.
 8. El frontend muestra el resultado en el visor de transacciones (UC-10).
 
@@ -122,8 +132,11 @@ flowchart TB
 | ID | Condición | Acción |
 |----|-----------|--------|
 | 1a | Validación Zod falla en frontend | Mostrar errores de campo; no enviar request. |
+| 1b | API key comercio inválida | Gateway responde `401`. |
+| 1c | Idempotency-Key duplicada | Gateway retorna respuesta cacheada (`409` o `200` idempotente). |
 | 4a | Luhn inválido o marca no reconocida | Oracle rechaza → Gateway responde `422`. |
-| 5a | Fondos insuficientes en riel seleccionado | Oracle rechaza → Gateway responde `402`; evaluar UC-08 si fallback habilitado. |
+| 4b | Antifraude decline (UC-12) | Oracle rechaza → Gateway responde `402`. |
+| 5a | Fondos insuficientes en riel seleccionado | Oracle rechaza → Gateway responde `402`; evaluar UC-08 (fallback automático D3). |
 | 6a | Riel no disponible (timeout RPC/API) | Gateway responde `503`; evaluar UC-08. |
 | 6b | Error interno en liquidación | Gateway responde `500`; transacción → `Failed`. |
 
@@ -203,7 +216,7 @@ flowchart TB
 1. Oracle recibe monto, moneda y `FundingType` (misma request de autorización).
 2. Consulta saldo/límite según riel:
    - **TraditionalBank**: límite estático o saldo bancario ficticio.
-   - **BinanceCex**: saldo Spot simulado − spread buffer.
+   - **BinanceCex**: saldo Spot simulado × (1 − `BINANCE_SPREAD_BUFFER_PCT`) — configurable (D4).
    - **SolanaWallet**: balance SPL vía RPC.
 3. Si fondos ≥ monto + fees, crea hold y retorna `HoldId`.
 4. Registra hold en persistencia del Oracle (`oracle/` — entidad `HOLD`).
@@ -248,6 +261,36 @@ flowchart TB
 | 3a | IP no está en allowlist | `403 Forbidden`. |
 | 4a | Rate limit excedido | `429 Too Many Requests`. |
 | 1a | Ruta fuera de `/internal/v1/` (excepto `/health`) | `404 Not Found`. |
+
+---
+
+### UC-12: Evaluar riesgo antifraude
+
+| Campo | Detalle |
+|-------|---------|
+| **ID** | UC-12 |
+| **Actor principal** | Servicio Antifraude (`antifraud/`) |
+| **Actores secundarios** | Oracle de Autorización |
+| **Descripción** | Evalúa scoring de riesgo (velocity, monto, token hash) antes de autorizar el hold. Decisión D11. |
+| **Precondiciones** | UC-11 aprobado; UC-03 completado (token hash disponible); `antifraud/` operativo. |
+| **Postcondiciones (éxito)** | Score aprobado; Oracle continúa con UC-04. |
+| **Postcondiciones (fallo)** | Decline; Oracle rechaza sin crear hold (**fail closed**). |
+| **Ubicación** | `antifraud/src/rules/`; cliente en `oracle/src/antifraud_client/` |
+
+**Flujo principal:**
+
+1. Oracle envía `POST /internal/v1/score` con monto, token hash, riel y metadata.
+2. Antifraude aplica reglas (velocity, monto máximo, listas básicas).
+3. Retorna `{ approved: true, score, reasons: [] }`.
+4. Oracle procede a UC-04.
+
+**Flujos alternativos:**
+
+| ID | Condición | Acción |
+|----|-----------|--------|
+| 2a | Score bajo umbral | `{ approved: false }` → Oracle responde `402` al Gateway. |
+| 1a | Antifraude no responde (timeout) | **Fail closed** → decline; Oracle responde `503` o `402`. |
+| 1b | API key antifraude inválida | Oracle registra error; fail closed → decline. |
 
 ---
 
@@ -303,7 +346,7 @@ flowchart TB
 |-------|---------|
 | **ID** | UC-07 |
 | **Actor principal** | Settlement Engine |
-| **Descripción** | Invoca `process_payment` en el programa Anchor para transferir tokens SPL al comercio. |
+| **Descripción** | Invoca `process_payment` en el programa Anchor; espera commitment **`finalized`** (D10) antes de confirmar. |
 | **Precondiciones** | Hold activo; `FundingType = SolanaWallet`; wallet con SOL para fees. |
 | **Postcondiciones** | Tx confirmada on-chain; evento `PaymentProcessed` emitido; transacción → `Settled`. |
 
@@ -313,7 +356,7 @@ flowchart TB
 2. Invoca `process_payment(amount, brand_code, settlement_rail_id)`.
 3. Programa transfiere tokens SPL de pagador a comercio.
 4. Emite evento `PaymentProcessed` (sin PII).
-5. Espera confirmación de la red.
+5. Espera confirmación **`finalized`** en RPC (D10; mayor latencia, irreversibilidad).
 6. Persiste `SettlementReceipt { type: Solana, tx_signature }`.
 7. Hold → `Consumed`; transacción → `Settled`.
 
@@ -323,7 +366,7 @@ flowchart TB
 |----|-----------|--------|
 | 2a | Cuenta sin signer válido | Tx rechazada; hold liberado; error on-chain. |
 | 2b | Integer overflow en amount | Programa retorna error; hold liberado. |
-| 5a | Tx no confirmada en timeout | Transacción → `Pending`; reintento configurable. |
+| 5a | Tx no alcanza `finalized` en timeout | Transacción → `Pending`; reintento configurable; hold no consumido hasta confirmación. |
 
 ---
 
@@ -333,7 +376,7 @@ flowchart TB
 |-------|---------|
 | **ID** | UC-08 |
 | **Actor principal** | Rail Switcher |
-| **Descripción** | Si el riel preferido no está disponible o tiene fondos insuficientes, selecciona el siguiente riel según prioridad configurada. |
+| **Descripción** | Si el riel preferido falla, selecciona automáticamente el siguiente según **prioridad** en `RAIL_CONFIG` (D3). |
 | **Precondiciones** | Fallback habilitado en configuración; existe al menos un riel alternativo habilitado. |
 | **Postcondiciones** | Nuevo riel seleccionado y flujo de autorización reintentado; o rechazo final si ningún riel es viable. |
 
@@ -414,6 +457,8 @@ erDiagram
         uuid id PK
         string name
         string default_currency
+        string api_key_hash "sk_test_... / sk_live_... (D12)"
+        enum api_key_env "test|live"
         timestamp created_at
     }
 
@@ -557,6 +602,25 @@ erDiagram
 
 ---
 
+### 3.2.1 Modelo off-chain — Antifraude (`antifraud/`)
+
+```mermaid
+erDiagram
+    FRAUD_SCORE_LOG {
+        uuid id PK
+        uuid authorization_request_id "correlación Oracle"
+        decimal amount
+        string token_hash "sin PAN"
+        enum funding_type
+        decimal score
+        enum result "Approved|Declined"
+        json reasons
+        timestamp created_at
+    }
+```
+
+---
+
 ### 3.3 Vista unificada Pasarela ↔ Oracle (referencia lógica)
 
 ```mermaid
@@ -687,14 +751,16 @@ flowchart TD
     Input --> Zod{Zod válido?}
     Zod -->|No| ShowErr[Mostrar errores UI]
     ShowErr --> Input
-    Zod -->|Sí| Post[POST /api/v1/checkout]
-    Post --> Validate[Oracle: Luhn + marca]
-    Validate --> ValidOK{Válida?}
-    ValidOK -->|No| R422[422 Invalid Card]
+    Zod -->|Sí| Post["POST /api/v1/checkout\n+ API key + Idempotency-Key"]
+    Post --> AuthMerchant{API key comercio OK?}
+    AuthMerchant -->|No| R401[401 Unauthorized]
+    AuthMerchant -->|Sí| Validate[Oracle: UC-11 → UC-03 → UC-12 → UC-04]
+    Validate --> ValidOK{Válida + antifraude OK?}
+    ValidOK -->|No| R422[422 / 402]
     ValidOK -->|Sí| SelectRail[Rail Switcher: confirmar riel]
-    SelectRail --> EvalFunds[Oracle: evaluar fondos]
-    EvalFunds --> FundsOK{Fondos OK?}
-    FundsOK -->|No| Fallback{Fallback habilitado?}
+    SelectRail --> EvalFunds[Fondos OK en hold]
+    EvalFunds --> FundsOK{Hold creado?}
+    FundsOK -->|No| Fallback{Fallback automático D3?}
     Fallback -->|Sí| SelectRail
     Fallback -->|No| R402[402 Insufficient Funds]
     FundsOK -->|Sí| CreateHold[Crear Hold]
@@ -702,7 +768,7 @@ flowchart TD
 
     RailType -->|TraditionalBank| SettleBank[Generar ISO 20022 / ACH]
     RailType -->|BinanceCex| SettleBinance[Débito API Binance]
-    RailType -->|SolanaWallet| SettleSolana[process_payment on-chain]
+    RailType -->|SolanaWallet| SettleSolana["process_payment\n(esperar finalized)"]
 
     SettleBank --> Success[200 OK + proof]
     SettleBinance --> Success
@@ -713,6 +779,7 @@ flowchart TD
     SettleSolana -->|Error| Fail
 
     Success --> ShowLog[TransactionViewer: mostrar comprobante]
+    R401 --> ShowLog
     R422 --> ShowLog
     R402 --> ShowLog
     Fail --> ShowLog
@@ -729,6 +796,7 @@ sequenceDiagram
     participant O as Oracle (oracle/)
     participant Auth as auth/ middleware
     participant L as validation/
+    participant AF as antifraud/
     participant F as funds/
     participant R as Riel Externo
 
@@ -744,10 +812,19 @@ sequenceDiagram
     end
 
     Auth->>L: validate(pan)
-    L-->>O: CardValidationResult (PAN tokenizado)
+    L-->>O: CardValidationResult (token hash, D6)
 
     alt Tarjeta inválida
         O-->>GW: 422 INVALID_CARD
+    end
+
+    O->>AF: POST /internal/v1/score (UC-12)
+
+    alt Antifraude decline o timeout
+        AF-->>O: approved: false
+        O-->>GW: 402 / 503
+    else Antifraude OK
+        AF-->>O: approved: true
     end
 
     O->>F: evaluate_funds(amount, funding_type)
@@ -757,7 +834,7 @@ sequenceDiagram
     else BinanceCex
         F->>R: GET /spot/balance (simulado)
         R-->>F: balance USDC/USDT
-        F->>F: aplicar spread buffer
+        F->>F: aplicar BINANCE_SPREAD_BUFFER_PCT (D4)
     else SolanaWallet
         F->>R: RPC getTokenAccountBalance
         R-->>F: balance SPL
@@ -850,7 +927,7 @@ sequenceDiagram
     PRG->>PRG: emit PaymentProcessed
     PRG-->>SC: Ok
     SC->>RPC: sendTransaction + confirm
-    RPC-->>SC: tx_signature
+    RPC-->>SC: tx_signature (commitment finalized, D10)
     SE->>DB: Settlement { proof: tx_signature }
     SE->>DB: Hold → Consumed
     SE->>DB: Transaction → Settled
@@ -941,7 +1018,7 @@ sequenceDiagram
     end
 
     CP->>TV: "Validando tarjeta…"
-    CP->>GW: POST /api/v1/checkout
+    CP->>GW: POST /api/v1/checkout + Authorization + Idempotency-Key
 
     alt 200 OK
         GW-->>CP: { transaction_id, status, rail, proof }
@@ -960,21 +1037,45 @@ sequenceDiagram
 
 | Caso de uso | Servicio | Entidades principales | Flujo de referencia |
 |-------------|----------|----------------------|---------------------|
-| UC-01 Checkout | Pasarela | TRANSACTION, PAYMENT_REQUEST, SETTLEMENT, ORACLE_HOLD_REF | §4.1, §4.7 |
-| UC-02 Seleccionar riel | Pasarela | RAIL_PREFERENCE, FUNDING_TYPE | §4.3 |
+| UC-01 Checkout | Pasarela | TRANSACTION, PAYMENT_REQUEST, SETTLEMENT, MERCHANT | §4.1, §4.7 |
+| UC-02 Seleccionar riel | Pasarela | RAIL_PREFERENCE, FUNDING_TYPE, RAIL_CONFIG | §4.3 |
 | UC-03 Validar tarjeta | Oracle | AUTHORIZATION_REQUEST, ORACLE_AUDIT_LOG | §4.2 |
 | UC-04 Autorizar hold | Oracle | HOLD, AUTHORIZATION_REQUEST | §4.2 |
-| UC-05 Liquidar Banco | Pasarela | SETTLEMENT, HOLD (release vía API) | §4.4.1 |
-| UC-06 Liquidar Binance | Pasarela | SETTLEMENT, HOLD (release vía API) | §4.4.2 |
+| UC-05 Liquidar Banco | Pasarela | SETTLEMENT | §4.4.1 |
+| UC-06 Liquidar Binance | Pasarela | SETTLEMENT | §4.4.2 |
 | UC-07 Liquidar Solana | Pasarela | SETTLEMENT, SETTLEMENT_STATE, PaymentProcessed | §4.4.3 |
-| UC-08 Fallback | Pasarela | RAIL_CONFIG, RAIL_PREFERENCE | §4.3, §4.6 |
+| UC-08 Fallback (D3) | Pasarela | RAIL_CONFIG, RAIL_PREFERENCE | §4.3, §4.6 |
 | UC-09 Consultar tx | Pasarela | TRANSACTION, SETTLEMENT | §4.5 |
 | UC-10 Visualizar log | Pasarela | GATEWAY_AUDIT_LOG, TRANSACTION | §4.7 |
 | UC-11 Control de acceso | Oracle | ORACLE_AUDIT_LOG | §4.2 |
+| UC-12 Antifraude (D11) | Antifraude | FRAUD_SCORE_LOG | §4.2 |
+
+---
+
+## 6. Tabla de decisiones aplicadas (D1–D12)
+
+| ID | Decisión | Impacto en casos de uso / flujos |
+|----|----------|--------------------------------|
+| D1 | Axum | Todos los microservicios Rust |
+| D2 | local validator + devnet CI | UC-07, tests Anchor |
+| D3 | Fallback automático | UC-08, §4.1, §4.3 |
+| D4 | Spread configurable | UC-04, UC-06 |
+| D5 | Monorepo | Estructura `oracle/`, `antifraud/` |
+| D6 | Token en memoria | UC-03; PAN no persiste |
+| D7 | mTLS Fase 7/8 | UC-11 (MVP: API key) |
+| D8 | 3DS post-MVP | No aplica en UC actuales |
+| D9 | Idempotency-Key | UC-01 paso 4 |
+| D10 | Commitment finalized | UC-07, §4.4.3 |
+| D11 | Antifraude externo | UC-12, §4.2 |
+| D12 | API key comercio | UC-01 paso 3–4, entidad MERCHANT |
+
+Ver detalle: [Arquitectura §12](./Arquitectura.md#12-decisiones-de-diseño--resueltas-fase-0).
 
 ---
 
 ## Referencias
 
-- [Arquitectura.md](./Arquitectura.md) — Componentes, traits, fases e **estructuras de seguridad Web2/Web3** (§9)
+- [Arquitectura.md](./Arquitectura.md) — Componentes, traits, fases, decisiones D1–D12 (§12), seguridad Web2/Web3 (§9)
+- [Plan-de-Implementacion.md](./Plan-de-Implementacion.md) — Hoja de ruta hasta producción
+- [Acta-Cierre-Fase-0.md](./Acta-Cierre-Fase-0.md) — Gate Fase 0 cerrado (2026-07-25)
 - [Contexto General.md](./Contexto%20General.md) — Prompt maestro del proyecto
