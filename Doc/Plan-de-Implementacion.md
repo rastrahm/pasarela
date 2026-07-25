@@ -12,8 +12,8 @@
 | **Objetivo** | Procesador de pagos con tarjeta y liquidación mutable en tres rieles (Banco, Binance CEX, Solana) |
 | **Enfoque** | Desarrollo secuencial por fases; confirmación explícita antes de avanzar |
 | **Unidades de despliegue** | `pasarela/` + `oracle/` + `antifraud/` (monorepo D5) |
-| **Fase actual** | **Fase 3 — Solana/Anchor** *(3.6 cerrada 2026-07-25)* |
-| **Próximo hito** | 3.8 gate `anchor test` + 3.9 devnet opcional |
+| **Fase actual** | **Fase 3 — Solana/Anchor** *(3.8 cerrada 2026-07-25)* |
+| **Próximo hito** | Gate Fase 3 (acta) + 3.9 devnet opcional |
 
 ### Estado actual del repositorio
 
@@ -23,7 +23,7 @@
 | Casos de uso, ER y flujos | ✅ Completados |
 | Esqueleto `oracle/` | ✅ Completo (67 tests, persistencia, seguridad) |
 | Workspace `pasarela/` (crates, programs, frontend) | ✅ `domain`, `rail-switcher`, `oracle-client`; scaffold `programs/payment-settlement/` |
-| CI/CD | ⬜ Pendiente |
+| CI/CD | ⬜ Pendiente (Rust) · ✅ `programs-anchor-test` workflow |
 | Despliegue producción | ⬜ Pendiente |
 
 ---
@@ -231,7 +231,7 @@ Programa Anchor `payment-settlement` con instrucción `process_payment`, transfe
 | 3.5 | Emitir evento `PaymentProcessed` | ✅ Sin PII (incluido en 3.4) |
 | 3.6 | Validaciones `#[derive(Accounts)]` explícitas | ✅ signer, owner, seeds, bump, mint, balance |
 | 3.7 | Errores personalizados `#[error_code]` | ✅ Unauthorized, InvalidMint, AmountOverflow, etc. |
-| 3.8 | Ejecutar `anchor test` en local validator | Suite verde |
+| 3.8 | Ejecutar `anchor test` en local validator | ✅ 17/17 verdes + workflow CI |
 | 3.9 | Desplegar en devnet (opcional MVP) | Registrar program ID |
 | 3.10 | Documentar instrucciones con `@notice/@param/@return` | Por cada instrucción pública |
 
@@ -246,10 +246,10 @@ programs/payment-settlement/
 
 ### Criterios de aceptación (gate)
 
-- [ ] `anchor test` verde (transferencia OK + casos de fallo)
-- [ ] Integer overflow rechazado
-- [ ] Firma no autorizada rechazada
-- [ ] Evento emitido sin PII
+- [x] `anchor test` verde (transferencia OK + casos de fallo) — 17 tests, validador local
+- [x] Integer overflow rechazado
+- [x] Firma no autorizada rechazada
+- [x] Evento emitido sin PII
 - [ ] Confirmación explícita para Fase 4
 
 ---
@@ -517,7 +517,7 @@ Según [Arquitectura §9.8](./Arquitectura.md#98-alcance-mvp-vs-producción):
 |---------|------|
 | PR / push | `oracle: cargo test && clippy` |
 | PR / push | `pasarela: cargo test && clippy` (cuando exista workspace) |
-| PR / push | `programs: anchor test` (cuando exista) |
+| PR / push | `programs: anchor test` | ✅ `.github/workflows/programs-anchor-test.yml` |
 | PR / push | `frontend: pnpm test && lint` (cuando exista) |
 | Pre-release | Playwright E2E contra stack local |
 

@@ -1,0 +1,77 @@
+# Gate Fase 3.8 — anchor test en validador local (Plan §13.1)
+name: Programs — anchor test
+
+on:
+  push:
+    branches: [main, master, liquidacion]
+    paths:
+      - "programs/payment-settlement/**"
+      - ".github/workflows/programs-anchor-test.yml"
+  pull_request:
+    paths:
+      - "programs/payment-settlement/**"
+      - ".github/workflows/programs-anchor-test.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: programs-anchor-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  anchor-test:
+    name: payment-settlement (17 tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: programs/payment-settlement
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: programs/payment-settlement/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Solana platform-tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/solana
+          key: solana-platform-tools-v1.52-${{ runner.os }}
+          restore-keys: |
+            solana-platform-tools-
+
+      - name: Install Solana CLI
+        run: |
+          curl -sSfL https://release.anza.xyz/v2.2.20/install | sh
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Install Anchor (AVM 0.31.1)
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor --tag v0.31.1 avm --locked --force
+          echo "$HOME/.avm/bin" >> "$GITHUB_PATH"
+          avm install 0.31.1
+          avm use 0.31.1
+          anchor --version
+
+      - name: Create ephemeral Solana wallet
+        run: |
+          mkdir -p ~/.config/solana
+          solana-keygen new --no-bip39-passphrase -s -o ~/.config/solana/id.json
+          solana address
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build SBF + IDL (platform-tools v1.52)
+        run: npm run build
+
+      - name: anchor test — local validator
+        run: anchor test --skip-build

@@ -41,8 +41,22 @@ programs/payment-settlement/
 ```bash
 cd programs/payment-settlement
 npm install
-npm run build          # SBF (v1.52) + IDL + types TS
-npm test                 # build + deploy + 12 tests
+npm test                 # build + anchor test (17 tests, validador local)
+npm run test:ci          # mismo gate que CI (scripts/ci-test.sh)
+```
+
+### CI (gate 3.8)
+
+Workflow: [`.github/workflows/programs-anchor-test.yml`](../../.github/workflows/programs-anchor-test.yml)
+
+| Trigger | Job |
+|---------|-----|
+| PR / push (`programs/payment-settlement/**`) | Solana 2.2.20 + Anchor 0.31.1 + platform-tools v1.52 + `anchor test` |
+
+Reproducir localmente el mismo gate:
+
+```bash
+./scripts/ci-test.sh
 ```
 
 ## Clusters (D2)
@@ -56,26 +70,14 @@ Program ID (local/devnet scaffold): `4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564
 
 ## Próximos pasos (Plan §7)
 
-### Estado tests (3.6)
+### Estado tests (3.8)
 
-`npm test` — **17/17 verdes** (bootstrap + PDA + §7.4 + constraints 3.6).
-
-| Constraint | Cuenta | Error |
-|------------|--------|-------|
-| `Signer` | `payer` | — |
-| `owner == payer` | `payer_token_account` | `Unauthorized` |
-| `mint` igual | payer ↔ merchant ATA | `InvalidMint` |
-| `amount >= payment` | `payer_token_account` | `InsufficientFunds` |
-| `amount > 0` | instrucción | `InvalidAmount` |
-| `owner == merchant` | `merchant_token_account` | `Unauthorized` |
-| `seeds + bump` | `settlement_state` PDA | `ConstraintSeeds` / `InvalidSettlementPda` |
-| espacio mínimo | `settlement_state` | `InsufficientAccountSpace` |
-| merchant en PDA | `settlement_state` | `Unauthorized` |
+`npm test` / `anchor test --skip-build` — **17/17 verdes** en validador local.
 
 | Paso | Entregable |
 |------|------------|
-| 3.8 | Gate CI con `anchor test` |
 | 3.9 | Devnet opcional |
+| Gate Fase 3 | Acta de cierre + confirmación Fase 4 |
 
 ### PDA `SettlementState` (3.3)
 
