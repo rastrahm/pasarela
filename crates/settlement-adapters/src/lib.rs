@@ -12,7 +12,7 @@ mod mock;
 mod solana;
 
 pub use adapter::SettlementAdapter;
-pub use bank::TraditionalBankAdapter;
+pub use bank::{BankCompensation, Pacs008Document, TraditionalBankAdapter, generate_bank_compensation};
 pub use binance::BinanceCexAdapter;
 pub use context::SettlementContext;
 pub use engine::SettlementEngine;

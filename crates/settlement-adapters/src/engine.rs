@@ -154,19 +154,29 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn stub_adapters_return_settlement_failed_until_implemented() {
+    async fn binance_and_solana_stubs_return_settlement_failed() {
         let engine = SettlementEngine::with_stub_adapters();
         let context = sample_context();
 
-        for rail in [
-            FundingType::TraditionalBank,
-            FundingType::BinanceCex,
-            FundingType::SolanaWallet,
-        ] {
+        for rail in [FundingType::BinanceCex, FundingType::SolanaWallet] {
             assert_eq!(
                 engine.settle(rail, context.clone()).await,
                 Err(LiquidityError::SettlementFailed)
             );
         }
+    }
+
+    #[tokio::test]
+    async fn traditional_bank_stub_settles_successfully() {
+        let engine = SettlementEngine::with_stub_adapters();
+        let context = sample_context();
+
+        let receipt = engine
+            .settle(FundingType::TraditionalBank, context)
+            .await
+            .expect("bank settled");
+
+        assert_eq!(receipt.rail, FundingType::TraditionalBank);
+        assert!(receipt.proof.starts_with("ACH-"));
     }
 }
