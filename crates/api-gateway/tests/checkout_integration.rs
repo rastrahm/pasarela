@@ -111,6 +111,70 @@ async fn checkout_returns_settled_with_mock_oracle() {
 }
 
 #[tokio::test]
+async fn get_transaction_returns_checkout_result() {
+    let oracle_url = spawn_mock_oracle().await;
+    let state = test_state(oracle_url).await;
+    let app = build_app(state);
+
+    let checkout_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/checkout")
+                .header("content-type", "application/json")
+                .header("x-forwarded-for", "127.0.0.1")
+                .body(Body::from(
+                    r#"{"amount":100.0,"currency":"USD","funding_type":"traditional_bank","card":{"pan":"4111111111111111","expiry_month":"12","expiry_year":"2030","cvv":"123","cardholder":"Test User"}}"#,
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(checkout_response.status(), StatusCode::OK);
+
+    let checkout_bytes = checkout_response
+        .into_body()
+        .collect()
+        .await
+        .expect("body")
+        .to_bytes();
+    let checkout_json: serde_json::Value =
+        serde_json::from_slice(&checkout_bytes).expect("json");
+    let transaction_id = checkout_json["transaction_id"]
+        .as_str()
+        .expect("transaction_id");
+
+    let get_response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/transactions/{transaction_id}"))
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(get_response.status(), StatusCode::OK);
+
+    let get_bytes = get_response
+        .into_body()
+        .collect()
+        .await
+        .expect("body")
+        .to_bytes();
+    let get_json: serde_json::Value = serde_json::from_slice(&get_bytes).expect("json");
+    assert_eq!(get_json["transaction_id"], transaction_id);
+    assert_eq!(get_json["status"], "settled");
+    assert_eq!(get_json["rail_used"], "traditional_bank");
+    assert_eq!(
+        get_json["settlement_proof"],
+        checkout_json["settlement_proof"]
+    );
+}
+
+#[tokio::test]
 async fn checkout_rejects_invalid_amount() {
     let app = build_app(test_state(spawn_mock_oracle().await).await);
 

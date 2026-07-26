@@ -13,7 +13,7 @@ use axum::{
 use uuid::Uuid;
 
 use crate::error::GatewayError;
-use crate::services::{extract_caller_ip, process_checkout, CheckoutInput};
+use crate::services::{extract_caller_ip, lookup_transaction, process_checkout, CheckoutInput};
 use crate::state::AppState;
 
 pub use dto::{
@@ -55,10 +55,11 @@ async fn checkout(
     Ok(Json(response))
 }
 
-/// Consulta de estado de transacción (implementación en paso 4.8).
+/// Consulta de estado de transacción (UC-09).
 async fn get_transaction(
-    State(_state): State<Arc<AppState>>,
-    Path(_id): Path<Uuid>,
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
 ) -> Result<Json<TransactionResponse>, GatewayError> {
-    Err(GatewayError::NotImplemented("get_transaction"))
+    let response = lookup_transaction(state.as_ref(), id)?;
+    Ok(Json(response))
 }

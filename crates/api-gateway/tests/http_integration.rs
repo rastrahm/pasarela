@@ -104,7 +104,7 @@ async fn health_returns_ok() {
 }
 
 #[tokio::test]
-async fn get_transaction_route_is_registered() {
+async fn get_transaction_returns_not_found_for_unknown_id() {
     let app = build_app(test_state());
     let tx_id = "550e8400-e29b-41d4-a716-446655440000";
 
@@ -118,5 +118,14 @@ async fn get_transaction_route_is_registered() {
         .await
         .expect("response");
 
-    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+    let bytes = response
+        .into_body()
+        .collect()
+        .await
+        .expect("body")
+        .to_bytes();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).expect("json");
+    assert_eq!(json["error_code"], "NOT_FOUND");
 }
