@@ -361,7 +361,7 @@ Validar el sistema completo, cerrar brechas de seguridad del MVP y preparar arte
 | 6.4 | Revisión de seguridad | OWASP, PCI simulado, frontera Oracle (§9 Arquitectura) | ✅ [Revision-Seguridad-Fase-6.md](./Revision-Seguridad-Fase-6.md) |
 | 6.5 | Revisión de rendimiento | Latencia checkout ~1–3 s; sin cuellos obvios | ✅ [Revision-Rendimiento-Fase-6.md](./Revision-Rendimiento-Fase-6.md) |
 | 6.6 | CI pipeline | `cargo test`, `anchor test`, `pnpm test`, Playwright | ✅ [`ci.yml`](../.github/workflows/ci.yml) + [`Doc/CI.md`](./CI.md) |
-| 6.7 | Documentar runbook de desarrollo | Cómo levantar todo el stack localmente (`cargo run`, servicios en terminal) |
+| 6.7 | Documentar runbook de desarrollo | Cómo levantar todo el stack localmente (`cargo run`, servicios en terminal) | ✅ [Runbook-Desarrollo.md](./Runbook-Desarrollo.md) + [`scripts/check-env.sh`](../scripts/check-env.sh) |
 | 6.8 | Resolver deuda técnica crítica | Lista priorizada — [Deuda-Tecnica.md](./Deuda-Tecnica.md) |
 
 ### Checklist QA mínimo (extracto)
@@ -605,6 +605,7 @@ Cada transición requiere **confirmación explícita** (según Contexto General)
 | `oracle/README.md` | Operación del servicio Oracle |
 | `crates/api-gateway/README.md` | Operación del Gateway, curl/Postman |
 | [Doc/CI.md](./CI.md) | Pipelines GitHub Actions (Fase 6.6) |
+| [Runbook-Desarrollo.md](./Runbook-Desarrollo.md) | Stack local sin contenedores (Fase 6.7) |
 | [Revision-Rendimiento-Fase-6.md](./Revision-Rendimiento-Fase-6.md) | Rendimiento checkout Fase 6.5 |
 | [Revision-Seguridad-Fase-6.md](./Revision-Seguridad-Fase-6.md) | Revisión OWASP/PCI Fase 6.4 |
 | [Checklist-QA-Fase-6.md](./Checklist-QA-Fase-6.md) | QA UC-01–UC-11 (Fase 6.3) |
@@ -620,4 +621,4 @@ Cada transición requiere **confirmación explícita** (según Contexto General)
 
 1. ~~**Cerrar Fase 0**~~ ✅ Ver [Acta-Cierre-Fase-0.md](./Acta-Cierre-Fase-0.md).
 2. ~~**Fases 1–5**~~ ✅ Dominio, Oracle, Solana, Gateway, Frontend — ver actas de cierre.
-3. **Fase 6 en curso**: CI en [Doc/CI.md](./Doc/CI.md); pendiente runbook (6.7) y gate final.
+3. **Fase 6 en curso**: runbook en [Runbook-Desarrollo.md](./Runbook-Desarrollo.md); pendiente gate final (6.8, E2E 3 rieles, QA firmado).

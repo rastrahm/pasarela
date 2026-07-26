@@ -66,3 +66,4 @@ npm run test:ci   # o anchor test --skip-build
 - [Plan-de-Implementacion.md §10](./Plan-de-Implementacion.md#10-fase-6--integración-qa-y-hardening)
 - [Revision-Rendimiento-Fase-6.md](./Revision-Rendimiento-Fase-6.md)
 - [tests/e2e/README.md](../tests/e2e/README.md)
+- [Runbook-Desarrollo.md](./Runbook-Desarrollo.md)

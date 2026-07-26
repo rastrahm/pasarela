@@ -18,7 +18,7 @@ pnpm exec playwright install chromium
 
 ## Stack para tests contra backend real
 
-Orden recomendado (sin contenedores):
+Orden recomendado — detalle en [Doc/Runbook-Desarrollo.md](../../Doc/Runbook-Desarrollo.md):
 
 ```bash
 # Terminal 1 — simuladores (según riel)
@@ -77,6 +77,7 @@ tests/e2e/
 
 ## Referencias
 
+- [Doc/Runbook-Desarrollo.md](../../Doc/Runbook-Desarrollo.md) — stack local completo
 - [Doc/Plan-de-Implementacion.md §10](../../Doc/Plan-de-Implementacion.md)
 - [Doc/Deuda-Tecnica.md](../../Doc/Deuda-Tecnica.md)
 - [frontend/README.md](../../frontend/README.md)

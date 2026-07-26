@@ -135,7 +135,7 @@ Arquitectura §851: *"Implica mayor latencia a cambio de irreversibilidad"*.
 
 ## 8. Verificación manual (stack real)
 
-Cuando el runbook (6.7) esté disponible:
+Ver [Doc/Runbook-Desarrollo.md](./Runbook-Desarrollo.md) para levantar el stack y ejecutar benches manuales.
 
 ```bash
 # Health

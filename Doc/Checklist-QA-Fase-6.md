@@ -279,7 +279,7 @@ cd programs/payment-settlement && anchor test
 | Prioridad | Item | UC | Paso Fase 6 |
 |-----------|------|-----|-------------|
 | P0 | E2E Playwright 3 rieles con stack real | UC-01, UC-10 | 6.1 |
-| P0 | Runbook stack local | Todos | 6.7 |
+| P0 | Runbook stack local | Todos | 6.7 ✅ [Runbook-Desarrollo.md](./Runbook-Desarrollo.md) |
 | P1 | E2E binance-sim + settlement HTTP real | UC-06 | 6.2 extensión |
 | P1 | Pantalla UC-09 | UC-09 | Post-MVP |
 | P2 | `POST /hold/consume` | UC-04 | v1.1 Oracle |

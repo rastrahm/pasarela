@@ -46,20 +46,19 @@
 
 | Campo | Valor |
 |-------|-------|
-| **Estado** | Pendiente (Fase 6.7) |
-| **Evidencia** | 6 archivos `.env.example` sin índice raíz; orden de arranque documentado parcialmente en READMEs por servicio |
-| **Impacto** | E2E y onboarding manual frágiles |
-| **Acción** | `Doc/Runbook-Desarrollo.md` + script `scripts/check-env.sh` |
+| **Estado** | **Resuelto** (2026-07-26) |
+| **Evidencia** | [Doc/Runbook-Desarrollo.md](./Runbook-Desarrollo.md) — orden de arranque, matriz por riel, troubleshooting |
+| **Script** | [`scripts/check-env.sh`](../scripts/check-env.sh) |
 | **Servicios** | binance-sim → antifraud → oracle → gateway → frontend |
 
 ### DT-P0-04 — Variables de entorno desincronizadas entre servicios
 
 | Campo | Valor |
 |-------|-------|
-| **Estado** | Pendiente |
-| **Evidencia** | Ver tabla §5 |
+| **Estado** | **Mitigado** (2026-07-26) |
+| **Evidencia** | Tabla canónica en [Runbook-Desarrollo.md §4](./Runbook-Desarrollo.md#4-tabla-canónica-de-variables); validación `./scripts/check-env.sh` |
 | **Impacto** | Fallos en runtime difíciles de diagnosticar |
-| **Acción** | Tabla canónica en runbook; validación al arranque (opcional) |
+| **Pendiente** | Validación al arranque en código (opcional, post-gate) |
 
 ---
 
