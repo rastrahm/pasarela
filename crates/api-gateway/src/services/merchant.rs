@@ -1,9 +1,10 @@
-//! Registro de comercios y API keys (D12) — in-memory hasta paso 4.12.
+//! Registro de comercios y API keys (D12).
 
 use std::collections::HashMap;
 use std::sync::RwLock;
 
 use domain::MerchantId;
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::error::GatewayError;
@@ -22,18 +23,23 @@ pub struct AuthenticatedMerchant {
     pub mode: ApiKeyMode,
 }
 
-/// Catálogo in-memory de API keys → comercio.
+/// Catálogo de API keys (hash) → comercio.
 #[derive(Default)]
 pub struct MerchantRegistry {
-    by_api_key: RwLock<HashMap<String, AuthenticatedMerchant>>,
+    by_api_key_hash: RwLock<HashMap<String, AuthenticatedMerchant>>,
 }
 
 impl MerchantRegistry {
-    /// Registra un comercio con su API key en texto plano (solo dev / bootstrap).
-    pub fn register(&self, api_key: impl Into<String>, merchant_id: MerchantId, mode: ApiKeyMode) {
-        if let Ok(mut map) = self.by_api_key.write() {
+    /// Registra un comercio a partir del hash de su API key (PostgreSQL).
+    pub fn register_hash(
+        &self,
+        api_key_hash: impl Into<String>,
+        merchant_id: MerchantId,
+        mode: ApiKeyMode,
+    ) {
+        if let Ok(mut map) = self.by_api_key_hash.write() {
             map.insert(
-                api_key.into(),
+                api_key_hash.into(),
                 AuthenticatedMerchant {
                     merchant_id,
                     mode,
@@ -42,14 +48,20 @@ impl MerchantRegistry {
         }
     }
 
+    /// Registra un comercio con su API key en texto plano (dev / bootstrap in-memory).
+    pub fn register(&self, api_key: impl Into<String>, merchant_id: MerchantId, mode: ApiKeyMode) {
+        let api_key = api_key.into();
+        self.register_hash(hash_api_key(&api_key), merchant_id, mode);
+    }
+
     /// Resuelve un comercio a partir de la API key presentada.
     pub fn authenticate(&self, api_key: &str) -> Result<AuthenticatedMerchant, GatewayError> {
         validate_api_key_format(api_key)?;
 
-        self.by_api_key
+        self.by_api_key_hash
             .read()
             .ok()
-            .and_then(|map| map.get(api_key).copied())
+            .and_then(|map| map.get(&hash_api_key(api_key)).copied())
             .ok_or(GatewayError::Unauthorized)
     }
 
@@ -147,6 +159,12 @@ fn is_api_key_char(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-'
 }
 
+/// Calcula SHA-256 hex de una API key para persistencia segura.
+pub fn hash_api_key(api_key: &str) -> String {
+    let digest = Sha256::digest(api_key.as_bytes());
+    format!("{:x}", digest)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -178,5 +196,17 @@ mod tests {
             .expect("authenticated");
         assert_eq!(auth.merchant_id, merchant_id);
         assert_eq!(auth.mode, ApiKeyMode::Test);
+    }
+
+    #[test]
+    fn hash_api_key_is_deterministic() {
+        assert_eq!(
+            hash_api_key("sk_test_validkey1"),
+            hash_api_key("sk_test_validkey1")
+        );
+        assert_ne!(
+            hash_api_key("sk_test_validkey1"),
+            hash_api_key("sk_test_validkey2")
+        );
     }
 }

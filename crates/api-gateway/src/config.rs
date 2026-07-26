@@ -7,7 +7,7 @@ use domain::{FundingType, MerchantId};
 use rail_switcher::RailConfig;
 use uuid::Uuid;
 
-    use crate::services::merchant::{MerchantApiKeyEntry, parse_merchant_api_keys};
+use crate::services::merchant::{MerchantApiKeyEntry, parse_merchant_api_keys};
 use crate::services::rails::{default_availability, default_rail_configs, RailContext};
 
 /// Configuración del servicio Gateway.
@@ -32,7 +32,7 @@ pub struct AppConfig {
     pub rail_fallback_enabled: bool,
     /// Configuración operativa de rieles (`RAIL_CONFIG`).
     pub rail_configs: Vec<RailConfig>,
-    /// Reservada para persistencia (paso 4.12).
+    /// Reservada para persistencia PostgreSQL (paso 4.12).
     pub database_url: Option<String>,
 }
 

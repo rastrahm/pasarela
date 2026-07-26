@@ -19,7 +19,7 @@ use api_gateway::{
     services::{IDEMPOTENCY_KEY_HEADER, RailContext},
     state::AppState,
 };
-use common::{bearer_header, test_app_config, test_merchant_id, test_merchant_registry};
+use common::{bearer_header, test_app_config, test_merchant_id, test_merchant_registry, TEST_API_KEY};
 use rail_switcher::RailSwitcher;
 use settlement_adapters::SettlementEngine;
 
@@ -200,7 +200,8 @@ async fn startup_fails_when_oracle_health_unreachable() {
     let merchant_id = test_merchant_id();
     let mut config = (*test_app_config("http://127.0.0.1:1".to_string(), merchant_id)).clone();
     config.oracle_health_check = true;
-    let result = AppState::new(Arc::new(config), test_merchant_registry(merchant_id)).await;
+    config.bootstrap_test_api_key = Some(TEST_API_KEY.to_string());
+    let result = AppState::new(Arc::new(config)).await;
     assert!(result.is_err());
 }
 

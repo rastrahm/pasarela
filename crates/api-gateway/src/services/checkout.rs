@@ -10,11 +10,13 @@ use oracle_client::{
 };
 use rust_decimal::Decimal;
 use settlement_adapters::SettlementContext;
+use uuid::Uuid;
 
 use crate::error::GatewayError;
+use crate::persistence::{AuditEvent, SettlementRecord, SettlementStatus, TransactionRecord};
 use crate::routes::{CheckoutRequest, CheckoutResponse};
 use crate::services::rails::{select_rail, settlement_rail_id};
-use crate::state::{AppState, TransactionRecord};
+use crate::state::AppState;
 
 /// Parámetros de una solicitud de checkout entrante.
 #[derive(Clone)]
@@ -22,6 +24,23 @@ pub struct CheckoutInput {
     pub merchant_id: domain::MerchantId,
     pub request: CheckoutRequest,
     pub caller_ip: Option<String>,
+}
+
+async fn persist_audit(
+    state: &AppState,
+    transaction_id: Uuid,
+    event_type: &str,
+    detail: impl Into<String>,
+) -> Result<(), GatewayError> {
+    state
+        .store()
+        .append_audit(&AuditEvent {
+            transaction_id: Some(transaction_id),
+            event_type: event_type.to_string(),
+            detail: detail.into(),
+        })
+        .await
+        .map_err(|err| GatewayError::Internal(err.to_string()))
 }
 
 /// Ejecuta el flujo completo UC-01: selección de riel → authorize → settle → respuesta.
@@ -40,6 +59,28 @@ pub async fn process_checkout(
         amount,
         &currency,
     )?;
+
+    state
+        .save_transaction(TransactionRecord {
+            transaction_id: transaction_id.0,
+            merchant_id,
+            status: TransactionStatus::Pending,
+            amount: amount.value(),
+            currency: currency.as_str().to_string(),
+            rail_used: Some(rail),
+            settlement_proof: None,
+            oracle_hold_id: None,
+        })
+        .await
+        .map_err(|err| GatewayError::Internal(err.to_string()))?;
+
+    persist_audit(
+        state,
+        transaction_id.0,
+        "checkout.started",
+        format!("rail={rail:?}"),
+    )
+    .await?;
 
     let gateway_request_id = transaction_id.0;
     let authorize_request = AuthorizeRequest {
@@ -60,12 +101,28 @@ pub async fn process_checkout(
         .await
         .map_err(GatewayError::from_oracle_error)?;
 
+    state
+        .save_transaction(TransactionRecord {
+            transaction_id: transaction_id.0,
+            merchant_id,
+            status: TransactionStatus::Held,
+            amount: amount.value(),
+            currency: currency.as_str().to_string(),
+            rail_used: Some(rail),
+            settlement_proof: None,
+            oracle_hold_id: Some(auth.hold_id),
+        })
+        .await
+        .map_err(|err| GatewayError::Internal(err.to_string()))?;
+
+    persist_audit(state, transaction_id.0, "checkout.authorized", "hold created").await?;
+
     let settlement_context = SettlementContext {
         hold_id: HoldId::new(auth.hold_id),
         transaction_id,
         merchant_id,
         amount,
-        currency,
+        currency: currency.clone(),
         brand_code: auth.brand_code,
         settlement_rail_id: settlement_rail_id(rail),
     };
@@ -80,14 +137,37 @@ pub async fn process_checkout(
                 transaction_id: transaction_id.0,
                 status: TransactionStatus::Settled,
                 rail_used: receipt.rail,
-                settlement_proof: Some(receipt.proof),
+                settlement_proof: Some(receipt.proof.clone()),
             };
-            state.store_transaction(TransactionRecord {
-                transaction_id: transaction_id.0,
-                status: TransactionStatus::Settled,
-                rail_used: Some(receipt.rail),
-                settlement_proof: response.settlement_proof.clone(),
-            });
+
+            state
+                .save_transaction(TransactionRecord {
+                    transaction_id: transaction_id.0,
+                    merchant_id,
+                    status: TransactionStatus::Settled,
+                    amount: amount.value(),
+                    currency: currency.as_str().to_string(),
+                    rail_used: Some(receipt.rail),
+                    settlement_proof: response.settlement_proof.clone(),
+                    oracle_hold_id: Some(auth.hold_id),
+                })
+                .await
+                .map_err(|err| GatewayError::Internal(err.to_string()))?;
+
+            state
+                .store()
+                .insert_settlement(&SettlementRecord {
+                    id: Uuid::new_v4(),
+                    transaction_id: transaction_id.0,
+                    rail_type: receipt.rail,
+                    proof: receipt.proof,
+                    status: SettlementStatus::Completed,
+                })
+                .await
+                .map_err(|err| GatewayError::Internal(err.to_string()))?;
+
+            persist_audit(state, transaction_id.0, "checkout.settled", "settlement ok").await?;
+
             Ok(response)
         }
         Err(settlement_err) => {
@@ -96,12 +176,21 @@ pub async fn process_checkout(
                 .release_hold(auth.hold_id, options)
                 .await;
 
-            state.store_transaction(TransactionRecord {
-                transaction_id: transaction_id.0,
-                status: TransactionStatus::Failed,
-                rail_used: Some(rail),
-                settlement_proof: None,
-            });
+            state
+                .save_transaction(TransactionRecord {
+                    transaction_id: transaction_id.0,
+                    merchant_id,
+                    status: TransactionStatus::Failed,
+                    amount: amount.value(),
+                    currency: currency.as_str().to_string(),
+                    rail_used: Some(rail),
+                    settlement_proof: None,
+                    oracle_hold_id: Some(auth.hold_id),
+                })
+                .await
+                .map_err(|err| GatewayError::Internal(err.to_string()))?;
+
+            persist_audit(state, transaction_id.0, "checkout.failed", "settlement failed").await?;
 
             Err(GatewayError::from_liquidity_error(settlement_err))
         }

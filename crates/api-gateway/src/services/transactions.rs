@@ -6,13 +6,15 @@ use crate::error::GatewayError;
 use crate::routes::TransactionResponse;
 use crate::state::AppState;
 
-/// Busca una transacción por ID en el repositorio in-memory del Gateway.
-pub fn lookup_transaction(
+/// Busca una transacción por ID en el repositorio del Gateway.
+pub async fn lookup_transaction(
     state: &AppState,
     transaction_id: Uuid,
 ) -> Result<TransactionResponse, GatewayError> {
     let record = state
         .get_transaction(transaction_id)
+        .await
+        .map_err(|err| GatewayError::Internal(err.to_string()))?
         .ok_or(GatewayError::NotFound)?;
 
     Ok(TransactionResponse {
@@ -33,14 +35,16 @@ mod tests {
         AuthorizeResponse, HealthResponse, OracleClient, OracleClientError, ReleaseHoldResponse,
     };
     use rail_switcher::RailSwitcher;
+    use rust_decimal::Decimal;
     use settlement_adapters::SettlementEngine;
     use uuid::Uuid;
 
     use super::*;
     use crate::config::AppConfig;
+    use crate::persistence::TransactionRecord;
     use crate::services::rails::default_rail_configs;
     use crate::services::{MerchantRegistry, RailContext};
-    use crate::state::{AppState, TransactionRecord};
+    use crate::state::AppState;
 
     struct StubOracle;
 
@@ -101,28 +105,38 @@ mod tests {
         )
     }
 
-    #[test]
-    fn returns_transaction_when_found() {
+    #[tokio::test]
+    async fn returns_transaction_when_found() {
         let state = test_state();
+        let merchant_id = MerchantId::new(Uuid::new_v4());
         let tx_id = Uuid::new_v4();
-        state.store_transaction(TransactionRecord {
-            transaction_id: tx_id,
-            status: TransactionStatus::Settled,
-            rail_used: Some(FundingType::TraditionalBank),
-            settlement_proof: Some("ACH-TEST".to_string()),
-        });
+        state
+            .save_transaction(TransactionRecord {
+                transaction_id: tx_id,
+                merchant_id,
+                status: TransactionStatus::Settled,
+                amount: Decimal::new(100, 0),
+                currency: "USD".to_string(),
+                rail_used: Some(FundingType::TraditionalBank),
+                settlement_proof: Some("ACH-TEST".to_string()),
+                oracle_hold_id: None,
+            })
+            .await
+            .expect("saved");
 
-        let response = lookup_transaction(&state, tx_id).expect("found");
+        let response = lookup_transaction(&state, tx_id).await.expect("found");
         assert_eq!(response.transaction_id, tx_id);
         assert_eq!(response.status, TransactionStatus::Settled);
         assert_eq!(response.rail_used, Some(FundingType::TraditionalBank));
         assert_eq!(response.settlement_proof.as_deref(), Some("ACH-TEST"));
     }
 
-    #[test]
-    fn returns_not_found_for_unknown_id() {
+    #[tokio::test]
+    async fn returns_not_found_for_unknown_id() {
         let state = test_state();
-        let err = lookup_transaction(&state, Uuid::new_v4()).expect_err("missing");
+        let err = lookup_transaction(&state, Uuid::new_v4())
+            .await
+            .expect_err("missing");
         assert!(matches!(err, GatewayError::NotFound));
     }
 }

@@ -1,14 +1,11 @@
 //! Idempotencia de checkout — header `Idempotency-Key` obligatorio (D9).
 
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
-use std::sync::RwLock;
-
 use axum::http::HeaderMap;
 use domain::MerchantId;
 use serde_json;
 
 use crate::error::GatewayError;
+use crate::persistence::PersistenceError;
 use crate::routes::{CheckoutRequest, CheckoutResponse};
 use crate::services::{process_checkout, CheckoutInput};
 use crate::state::AppState;
@@ -26,7 +23,7 @@ pub enum CachedCheckoutResult {
 }
 
 impl CachedCheckoutResult {
-    fn into_result(self) -> Result<CheckoutResponse, GatewayError> {
+    pub(crate) fn into_result(self) -> Result<CheckoutResponse, GatewayError> {
         match self {
             Self::Success(response) => Ok(response),
             Self::Error(error) => Err(error),
@@ -34,99 +31,18 @@ impl CachedCheckoutResult {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-enum IdempotencyEntry {
-    InFlight { fingerprint: String },
-    Completed {
-        fingerprint: String,
-        result: CachedCheckoutResult,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct IdempotencyCompositeKey {
-    merchant_id: uuid::Uuid,
-    key: String,
-}
-
-/// Store in-memory de claves idempotentes (persistencia en paso 4.12).
-#[derive(Default)]
-pub struct IdempotencyStore {
-    entries: RwLock<HashMap<IdempotencyCompositeKey, IdempotencyEntry>>,
-}
-
-impl IdempotencyStore {
-    /// Reserva una clave o devuelve la respuesta cacheada / conflicto.
-    pub fn begin(
-        &self,
-        merchant_id: MerchantId,
-        key: &str,
-        fingerprint: &str,
-    ) -> Result<Option<CachedCheckoutResult>, GatewayError> {
-        let composite = IdempotencyCompositeKey {
-            merchant_id: merchant_id.0,
-            key: key.to_string(),
-        };
-
-        let mut map = self
-            .entries
-            .write()
-            .map_err(|_| GatewayError::Internal("store idempotencia bloqueado".to_string()))?;
-
-        match map.entry(composite) {
-            Entry::Vacant(slot) => {
-                slot.insert(IdempotencyEntry::InFlight {
-                    fingerprint: fingerprint.to_string(),
-                });
-                Ok(None)
-            }
-            Entry::Occupied(slot) => match slot.get() {
-                IdempotencyEntry::InFlight { fingerprint: existing } if existing == fingerprint => {
-                    Err(GatewayError::Conflict(
-                        "checkout idempotente en curso".to_string(),
-                    ))
-                }
-                IdempotencyEntry::InFlight { .. } => Err(GatewayError::Conflict(
-                    "Idempotency-Key en uso con otra solicitud".to_string(),
-                )),
-                IdempotencyEntry::Completed {
-                    fingerprint: existing,
-                    result,
-                } if existing == fingerprint => Ok(Some(result.clone())),
-                IdempotencyEntry::Completed { .. } => Err(GatewayError::Conflict(
-                    "Idempotency-Key reutilizada con payload distinto".to_string(),
-                )),
-            },
+fn persistence_to_gateway_error(error: PersistenceError) -> GatewayError {
+    match error {
+        PersistenceError::Internal(message) if message.contains("Idempotency-Key") => {
+            GatewayError::Conflict(message)
         }
-    }
-
-    /// Persiste el resultado final de un checkout idempotente.
-    pub fn complete(
-        &self,
-        merchant_id: MerchantId,
-        key: &str,
-        fingerprint: &str,
-        result: &Result<CheckoutResponse, GatewayError>,
-    ) {
-        let composite = IdempotencyCompositeKey {
-            merchant_id: merchant_id.0,
-            key: key.to_string(),
-        };
-
-        let cached = match result {
-            Ok(response) => CachedCheckoutResult::Success(response.clone()),
-            Err(error) => CachedCheckoutResult::Error(error.clone()),
-        };
-
-        if let Ok(mut map) = self.entries.write() {
-            map.insert(
-                composite,
-                IdempotencyEntry::Completed {
-                    fingerprint: fingerprint.to_string(),
-                    result: cached,
-                },
-            );
+        PersistenceError::Internal(message) if message.contains("idempotente en curso") => {
+            GatewayError::Conflict(message)
         }
+        PersistenceError::Internal(message) if message.contains("en uso") => {
+            GatewayError::Conflict(message)
+        }
+        other => GatewayError::Internal(other.to_string()),
     }
 }
 
@@ -166,16 +82,20 @@ pub async fn process_checkout_idempotent(
     let fingerprint = request_fingerprint(&input.request)?;
 
     if let Some(cached) = state
-        .idempotency_store()
-        .begin(merchant_id, &idempotency_key, &fingerprint)?
+        .store()
+        .idempotency_begin(merchant_id, &idempotency_key, &fingerprint)
+        .await
+        .map_err(persistence_to_gateway_error)?
     {
         return cached.into_result();
     }
 
     let result = process_checkout(state, input).await;
     state
-        .idempotency_store()
-        .complete(merchant_id, &idempotency_key, &fingerprint, &result);
+        .store()
+        .idempotency_complete(merchant_id, &idempotency_key, &fingerprint, &result)
+        .await
+        .map_err(persistence_to_gateway_error)?;
 
     result
 }

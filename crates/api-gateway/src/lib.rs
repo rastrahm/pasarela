@@ -3,6 +3,7 @@
 pub mod config;
 pub mod error;
 pub mod logging;
+pub mod persistence;
 pub mod routes;
 pub mod services;
 pub mod state;
