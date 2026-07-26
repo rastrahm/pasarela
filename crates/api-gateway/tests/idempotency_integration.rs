@@ -1,5 +1,7 @@
 //! Tests de integración de idempotencia (D9).
 
+mod common;
+
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -10,7 +12,6 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::routing::get;
 use axum::{Json, Router};
-use domain::MerchantId;
 use http_body_util::BodyExt;
 use oracle_client::{
     AuthorizeResponse, HealthResponse, OracleClient, OracleClientError, ReleaseHoldResponse,
@@ -21,10 +22,12 @@ use uuid::Uuid;
 
 use api_gateway::{
     build_app,
-    config::AppConfig,
-    services::{rails::default_rail_configs, RailContext, IDEMPOTENCY_KEY_HEADER},
+    services::{IDEMPOTENCY_KEY_HEADER, RailContext},
     state::AppState,
 };
+use common::{bearer_header, test_app_config, test_merchant_id, test_merchant_registry};
+use rail_switcher::RailSwitcher;
+use settlement_adapters::SettlementEngine;
 
 struct CountingOracle {
     calls: Arc<AtomicUsize>,
@@ -87,26 +90,17 @@ async fn spawn_mock_oracle() -> String {
 }
 
 async fn test_state(calls: Arc<AtomicUsize>) -> AppState {
-    let config = Arc::new(AppConfig {
-        host: "127.0.0.1".to_string(),
-        port: 8080,
-        oracle_base_url: spawn_mock_oracle().await,
-        oracle_api_key: "test-key".to_string(),
-        oracle_timeout_secs: 2,
-        oracle_health_check: true,
-        default_merchant_id: MerchantId::new(Uuid::new_v4()),
-        merchant_default_funding_type: None,
-        rail_fallback_enabled: true,
-        rail_configs: default_rail_configs(),
-        database_url: None,
-    });
+    let merchant_id = test_merchant_id();
+    let mut config = (*test_app_config(spawn_mock_oracle().await, merchant_id)).clone();
+    config.oracle_health_check = true;
 
     AppState::from_parts(
-        config,
+        Arc::new(config),
         Arc::new(CountingOracle { calls }),
-        settlement_adapters::SettlementEngine::with_stub_adapters(),
-        rail_switcher::RailSwitcher,
+        SettlementEngine::with_stub_adapters(),
+        RailSwitcher,
         RailContext::default(),
+        test_merchant_registry(merchant_id),
     )
 }
 
@@ -126,6 +120,9 @@ async fn post_checkout(
     if let Some(key) = idempotency_key {
         builder = builder.header(IDEMPOTENCY_KEY_HEADER, key);
     }
+
+    let (auth_key, auth_value) = bearer_header();
+    builder = builder.header(auth_key, auth_value);
 
     let response = app
         .oneshot(
@@ -152,7 +149,30 @@ async fn checkout_requires_idempotency_key() {
     let calls = Arc::new(AtomicUsize::new(0));
     let app = build_app(test_state(calls).await);
 
-    let (status, json) = post_checkout(app, None, VALID_CHECKOUT).await;
+    let mut builder = Request::builder()
+        .method("POST")
+        .uri("/api/v1/checkout")
+        .header("content-type", "application/json");
+    let (auth_key, auth_value) = bearer_header();
+    builder = builder.header(auth_key, auth_value);
+
+    let response = app
+        .oneshot(
+            builder
+                .body(Body::from(VALID_CHECKOUT.to_string()))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    let status = response.status();
+    let bytes = response
+        .into_body()
+        .collect()
+        .await
+        .expect("body")
+        .to_bytes();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap_or(serde_json::json!({}));
 
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(json["error_code"], "INVALID_REQUEST");

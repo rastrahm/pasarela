@@ -1,19 +1,27 @@
 //! Tests de integración del checkout con Oracle simulado.
 
+mod common;
+
 use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use domain::MerchantId;
 use http_body_util::BodyExt;
 use oracle_client::{AuthorizeResponse, HealthResponse};
 use tokio::net::TcpListener;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-use api_gateway::{build_app, config::AppConfig, services::IDEMPOTENCY_KEY_HEADER, state::AppState};
+use api_gateway::{
+    build_app,
+    services::{IDEMPOTENCY_KEY_HEADER, RailContext},
+    state::AppState,
+};
+use common::{bearer_header, test_app_config, test_merchant_id, test_merchant_registry};
+use rail_switcher::RailSwitcher;
+use settlement_adapters::SettlementEngine;
 
 async fn spawn_mock_oracle() -> String {
     let hold_id = Uuid::new_v4();
@@ -51,46 +59,50 @@ async fn spawn_mock_oracle() -> String {
     format!("http://{addr}")
 }
 
-fn test_config(oracle_base_url: String) -> Arc<AppConfig> {
-    Arc::new(AppConfig {
-        host: "127.0.0.1".to_string(),
-        port: 8080,
-        oracle_base_url,
-        oracle_api_key: "test-gateway-key".to_string(),
-        oracle_timeout_secs: 2,
-        oracle_health_check: true,
-        default_merchant_id: MerchantId::new(Uuid::new_v4()),
-        merchant_default_funding_type: None,
-        rail_fallback_enabled: true,
-        rail_configs: api_gateway::services::rails::default_rail_configs(),
-        database_url: None,
-    })
+async fn test_state(oracle_base_url: String) -> AppState {
+    let merchant_id = test_merchant_id();
+    let config = test_app_config(oracle_base_url, merchant_id);
+    let oracle_client = Arc::new(
+        oracle_client::HttpOracleClient::new(
+            config.oracle_base_url.clone(),
+            config.oracle_api_key.clone(),
+            config.oracle_timeout_secs,
+        )
+        .expect("client"),
+    );
+
+    AppState::from_parts(
+        config,
+        oracle_client,
+        SettlementEngine::with_stub_adapters(),
+        RailSwitcher,
+        RailContext::default(),
+        test_merchant_registry(merchant_id),
+    )
 }
 
-async fn test_state(oracle_base_url: String) -> AppState {
-    AppState::new(test_config(oracle_base_url))
-        .await
-        .expect("state")
+fn checkout_request(body: &str, idempotency_key: &str) -> Request<Body> {
+    let (auth_key, auth_value) = bearer_header();
+    Request::builder()
+        .method("POST")
+        .uri("/api/v1/checkout")
+        .header("content-type", "application/json")
+        .header("x-forwarded-for", "127.0.0.1")
+        .header(auth_key, auth_value)
+        .header(IDEMPOTENCY_KEY_HEADER, idempotency_key)
+        .body(Body::from(body.to_string()))
+        .expect("request")
 }
 
 #[tokio::test]
 async fn checkout_returns_settled_with_mock_oracle() {
-    let oracle_url = spawn_mock_oracle().await;
-    let app = build_app(test_state(oracle_url).await);
+    let app = build_app(test_state(spawn_mock_oracle().await).await);
 
     let response = app
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/v1/checkout")
-                .header("content-type", "application/json")
-                .header("x-forwarded-for", "127.0.0.1")
-                .header(IDEMPOTENCY_KEY_HEADER, "checkout-int-001")
-                .body(Body::from(
-                    r#"{"amount":100.0,"currency":"USD","funding_type":"traditional_bank","card":{"pan":"4111111111111111","expiry_month":"12","expiry_year":"2030","cvv":"123","cardholder":"Test User"}}"#,
-                ))
-                .expect("request"),
-        )
+        .oneshot(checkout_request(
+            r#"{"amount":100.0,"currency":"USD","funding_type":"traditional_bank","card":{"pan":"4111111111111111","expiry_month":"12","expiry_year":"2030","cvv":"123","cardholder":"Test User"}}"#,
+            "checkout-int-001",
+        ))
         .await
         .expect("response");
 
@@ -113,24 +125,14 @@ async fn checkout_returns_settled_with_mock_oracle() {
 
 #[tokio::test]
 async fn get_transaction_returns_checkout_result() {
-    let oracle_url = spawn_mock_oracle().await;
-    let state = test_state(oracle_url).await;
-    let app = build_app(state);
+    let app = build_app(test_state(spawn_mock_oracle().await).await);
 
     let checkout_response = app
         .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/v1/checkout")
-                .header("content-type", "application/json")
-                .header("x-forwarded-for", "127.0.0.1")
-                .header(IDEMPOTENCY_KEY_HEADER, "checkout-int-001")
-                .body(Body::from(
-                    r#"{"amount":100.0,"currency":"USD","funding_type":"traditional_bank","card":{"pan":"4111111111111111","expiry_month":"12","expiry_year":"2030","cvv":"123","cardholder":"Test User"}}"#,
-                ))
-                .expect("request"),
-        )
+        .oneshot(checkout_request(
+            r#"{"amount":100.0,"currency":"USD","funding_type":"traditional_bank","card":{"pan":"4111111111111111","expiry_month":"12","expiry_year":"2030","cvv":"123","cardholder":"Test User"}}"#,
+            "checkout-int-get-tx",
+        ))
         .await
         .expect("response");
 
@@ -148,10 +150,12 @@ async fn get_transaction_returns_checkout_result() {
         .as_str()
         .expect("transaction_id");
 
+    let (auth_key, auth_value) = bearer_header();
     let get_response = app
         .oneshot(
             Request::builder()
                 .uri(format!("/api/v1/transactions/{transaction_id}"))
+                .header(auth_key, auth_value)
                 .body(Body::empty())
                 .expect("request"),
         )
@@ -181,17 +185,10 @@ async fn checkout_rejects_invalid_amount() {
     let app = build_app(test_state(spawn_mock_oracle().await).await);
 
     let response = app
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/v1/checkout")
-                .header("content-type", "application/json")
-                .header(IDEMPOTENCY_KEY_HEADER, "checkout-int-invalid-amount")
-                .body(Body::from(
-                    r#"{"amount":0,"currency":"USD","card":{"pan":"4111111111111111","expiry_month":"12","expiry_year":"2030","cvv":"123","cardholder":"Test User"}}"#,
-                ))
-                .expect("request"),
-        )
+        .oneshot(checkout_request(
+            r#"{"amount":0,"currency":"USD","card":{"pan":"4111111111111111","expiry_month":"12","expiry_year":"2030","cvv":"123","cardholder":"Test User"}}"#,
+            "checkout-int-invalid-amount",
+        ))
         .await
         .expect("response");
 
@@ -200,7 +197,54 @@ async fn checkout_rejects_invalid_amount() {
 
 #[tokio::test]
 async fn startup_fails_when_oracle_health_unreachable() {
-    let config = test_config("http://127.0.0.1:1".to_string());
-    let result = AppState::new(config).await;
+    let merchant_id = test_merchant_id();
+    let mut config = (*test_app_config("http://127.0.0.1:1".to_string(), merchant_id)).clone();
+    config.oracle_health_check = true;
+    let result = AppState::new(Arc::new(config), test_merchant_registry(merchant_id)).await;
     assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn checkout_rejects_missing_api_key() {
+    let app = build_app(test_state(spawn_mock_oracle().await).await);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/checkout")
+                .header("content-type", "application/json")
+                .header(IDEMPOTENCY_KEY_HEADER, "no-auth")
+                .body(Body::from(
+                    r#"{"amount":100.0,"currency":"USD","card":{"pan":"4111111111111111","expiry_month":"12","expiry_year":"2030","cvv":"123","cardholder":"Test User"}}"#,
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn checkout_rejects_invalid_api_key() {
+    let app = build_app(test_state(spawn_mock_oracle().await).await);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/checkout")
+                .header("content-type", "application/json")
+                .header("authorization", "Bearer sk_test_unknown1")
+                .header(IDEMPOTENCY_KEY_HEADER, "bad-auth")
+                .body(Body::from(
+                    r#"{"amount":100.0,"currency":"USD","card":{"pan":"4111111111111111","expiry_month":"12","expiry_year":"2030","cvv":"123","cardholder":"Test User"}}"#,
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }

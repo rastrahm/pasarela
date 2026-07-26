@@ -1,5 +1,7 @@
 //! Tests de integración HTTP del API Gateway.
 
+mod common;
+
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -7,11 +9,10 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use api_gateway::{
     build_app,
-    config::AppConfig,
-    services::{rails::default_rail_configs, RailContext},
+    services::RailContext,
     state::AppState,
 };
-use domain::MerchantId;
+use common::{bearer_header, test_app_config, test_merchant_id, test_merchant_registry};
 use http_body_util::BodyExt;
 use oracle_client::{
     AuthorizeResponse, HealthResponse, OracleClient, OracleClientError, ReleaseHoldResponse,
@@ -53,19 +54,8 @@ impl OracleClient for StubOracle {
 }
 
 fn test_state() -> AppState {
-    let config = Arc::new(AppConfig {
-        host: "127.0.0.1".to_string(),
-        port: 8080,
-        oracle_base_url: "http://127.0.0.1:8081".to_string(),
-        oracle_api_key: "test-gateway-key".to_string(),
-        oracle_timeout_secs: 2,
-        oracle_health_check: false,
-        default_merchant_id: MerchantId::new(Uuid::new_v4()),
-        merchant_default_funding_type: None,
-        rail_fallback_enabled: true,
-        rail_configs: default_rail_configs(),
-        database_url: None,
-    });
+    let merchant_id = test_merchant_id();
+    let config = test_app_config("http://127.0.0.1:8081".to_string(), merchant_id);
 
     AppState::from_parts(
         config,
@@ -73,6 +63,7 @@ fn test_state() -> AppState {
         SettlementEngine::with_stub_adapters(),
         RailSwitcher,
         RailContext::default(),
+        test_merchant_registry(merchant_id),
     )
 }
 
@@ -107,11 +98,13 @@ async fn health_returns_ok() {
 async fn get_transaction_returns_not_found_for_unknown_id() {
     let app = build_app(test_state());
     let tx_id = "550e8400-e29b-41d4-a716-446655440000";
+    let (auth_key, auth_value) = bearer_header();
 
     let response = app
         .oneshot(
             Request::builder()
                 .uri(format!("/api/v1/transactions/{tx_id}"))
+                .header(auth_key, auth_value)
                 .body(Body::empty())
                 .expect("request"),
         )
@@ -128,4 +121,22 @@ async fn get_transaction_returns_not_found_for_unknown_id() {
         .to_bytes();
     let json: serde_json::Value = serde_json::from_slice(&bytes).expect("json");
     assert_eq!(json["error_code"], "NOT_FOUND");
+}
+
+#[tokio::test]
+async fn get_transaction_requires_api_key() {
+    let app = build_app(test_state());
+    let tx_id = "550e8400-e29b-41d4-a716-446655440000";
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/transactions/{tx_id}"))
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("response");
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }

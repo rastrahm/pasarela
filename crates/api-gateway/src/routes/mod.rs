@@ -14,8 +14,8 @@ use uuid::Uuid;
 
 use crate::error::GatewayError;
 use crate::services::{
-    extract_caller_ip, extract_idempotency_key, lookup_transaction, process_checkout_idempotent,
-    CheckoutInput,
+    authenticate_merchant, extract_caller_ip, extract_idempotency_key, lookup_transaction,
+    process_checkout_idempotent, CheckoutInput,
 };
 use crate::state::AppState;
 
@@ -47,11 +47,14 @@ async fn checkout(
     body: Result<Json<CheckoutRequest>, axum::extract::rejection::JsonRejection>,
 ) -> Result<Json<CheckoutResponse>, GatewayError> {
     let Json(body) = body.map_err(|_| GatewayError::InvalidRequest)?;
+    let merchant = authenticate_merchant(&headers, state.merchant_registry.as_ref())?;
     let idempotency_key = extract_idempotency_key(&headers)?;
     let response = process_checkout_idempotent(
         state.as_ref(),
+        merchant.merchant_id,
         idempotency_key,
         CheckoutInput {
+            merchant_id: merchant.merchant_id,
             request: body,
             caller_ip: extract_caller_ip(&headers),
         },
@@ -64,8 +67,10 @@ async fn checkout(
 /// Consulta de estado de transacción (UC-09).
 async fn get_transaction(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> Result<Json<TransactionResponse>, GatewayError> {
+    let _merchant = authenticate_merchant(&headers, state.merchant_registry.as_ref())?;
     let response = lookup_transaction(state.as_ref(), id)?;
     Ok(Json(response))
 }

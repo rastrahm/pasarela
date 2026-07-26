@@ -15,7 +15,12 @@ async fn main() -> anyhow::Result<()> {
     let config = Arc::new(AppConfig::from_env().context("error cargando configuración")?);
     let listen_addr = config.listen_addr();
 
-    let state = AppState::new(config)
+    let merchant_registry = Arc::new(
+        config
+            .build_merchant_registry()
+            .context("error cargando API keys de comercio")?,
+    );
+    let state = AppState::new(config, merchant_registry)
         .await
         .context("error inicializando estado del Gateway (Oracle inalcanzable?)")?;
     let app = build_app(state);

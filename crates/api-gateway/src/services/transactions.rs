@@ -39,7 +39,7 @@ mod tests {
     use super::*;
     use crate::config::AppConfig;
     use crate::services::rails::default_rail_configs;
-    use crate::services::RailContext;
+    use crate::services::{MerchantRegistry, RailContext};
     use crate::state::{AppState, TransactionRecord};
 
     struct StubOracle;
@@ -74,6 +74,7 @@ mod tests {
     }
 
     fn test_state() -> AppState {
+        let merchant_id = MerchantId::new(Uuid::new_v4());
         let config = Arc::new(AppConfig {
             host: "127.0.0.1".to_string(),
             port: 8080,
@@ -81,7 +82,9 @@ mod tests {
             oracle_api_key: "key".to_string(),
             oracle_timeout_secs: 2,
             oracle_health_check: false,
-            default_merchant_id: MerchantId::new(Uuid::new_v4()),
+            default_merchant_id: merchant_id,
+            merchant_api_keys: vec![],
+            bootstrap_test_api_key: None,
             merchant_default_funding_type: None,
             rail_fallback_enabled: true,
             rail_configs: default_rail_configs(),
@@ -94,6 +97,7 @@ mod tests {
             SettlementEngine::with_stub_adapters(),
             RailSwitcher,
             RailContext::default(),
+            Arc::new(MerchantRegistry::single("sk_test_validkey1", merchant_id)),
         )
     }
 

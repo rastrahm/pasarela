@@ -1,5 +1,7 @@
 //! Integración Rail Switcher + oracle-client — selección de riel y autorización.
 
+mod common;
+
 use std::sync::{Arc, Mutex};
 
 use axum::body::Body;
@@ -7,13 +9,13 @@ use axum::http::{Request, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use domain::{FundingType, MerchantId};
+use domain::FundingType;
 use http_body_util::BodyExt;
 use oracle_client::{
     error_codes, AuthorizeRequest, AuthorizeResponse, ErrorResponse,
     FundingType as OracleFundingType, HealthResponse, ReleaseHoldRequest, ReleaseHoldResponse,
 };
-use rail_switcher::RailAvailability;
+use rail_switcher::{RailAvailability, RailSwitcher};
 use settlement_adapters::SettlementEngine;
 use tokio::net::TcpListener;
 use tower::ServiceExt;
@@ -21,11 +23,10 @@ use uuid::Uuid;
 
 use api_gateway::{
     build_app,
-    config::AppConfig,
-    services::{rails::default_rail_configs, RailContext, IDEMPOTENCY_KEY_HEADER},
+    services::{RailContext, IDEMPOTENCY_KEY_HEADER},
     state::AppState,
 };
-use rail_switcher::RailSwitcher;
+use common::{bearer_header, test_app_config, test_merchant_id, test_merchant_registry};
 
 #[derive(Default)]
 struct OracleCapture {
@@ -98,27 +99,12 @@ async fn spawn_oracle(capture: Arc<OracleCapture>, insufficient: bool) -> String
     format!("http://{addr}")
 }
 
-fn base_config(oracle_url: String) -> Arc<AppConfig> {
-    Arc::new(AppConfig {
-        host: "127.0.0.1".to_string(),
-        port: 8080,
-        oracle_base_url: oracle_url,
-        oracle_api_key: "test-key".to_string(),
-        oracle_timeout_secs: 2,
-        oracle_health_check: false,
-        default_merchant_id: MerchantId::new(Uuid::new_v4()),
-        merchant_default_funding_type: None,
-        rail_fallback_enabled: true,
-        rail_configs: default_rail_configs(),
-        database_url: None,
-    })
-}
-
 async fn state_with_rail_context(
     oracle_url: String,
     rail_context: RailContext,
 ) -> AppState {
-    let config = base_config(oracle_url);
+    let merchant_id = test_merchant_id();
+    let config = test_app_config(oracle_url, merchant_id);
     let oracle_client = Arc::new(
         oracle_client::HttpOracleClient::new(
             config.oracle_base_url.clone(),
@@ -134,6 +120,7 @@ async fn state_with_rail_context(
         SettlementEngine::with_stub_adapters(),
         RailSwitcher,
         rail_context,
+        test_merchant_registry(merchant_id),
     )
 }
 
@@ -144,16 +131,18 @@ fn card_payload_json(funding_type: &str) -> String {
 }
 
 async fn checkout_json(app: axum::Router, body: String) -> (StatusCode, serde_json::Value) {
+    let mut builder = Request::builder()
+        .method("POST")
+        .uri("/api/v1/checkout")
+        .header("content-type", "application/json")
+        .header("x-forwarded-for", "127.0.0.1")
+        .header(IDEMPOTENCY_KEY_HEADER, "rail-oracle-test-key");
+    let (auth_key, auth_value) = bearer_header();
+    builder = builder.header(auth_key, auth_value);
+
     let response = app
         .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/v1/checkout")
-                .header("content-type", "application/json")
-                .header("x-forwarded-for", "127.0.0.1")
-                .header(IDEMPOTENCY_KEY_HEADER, "rail-oracle-test-key")
-                .body(Body::from(body))
-                .expect("request"),
+            builder.body(Body::from(body)).expect("request"),
         )
         .await
         .expect("response");

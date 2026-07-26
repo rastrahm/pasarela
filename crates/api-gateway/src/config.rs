@@ -7,6 +7,7 @@ use domain::{FundingType, MerchantId};
 use rail_switcher::RailConfig;
 use uuid::Uuid;
 
+    use crate::services::merchant::{MerchantApiKeyEntry, parse_merchant_api_keys};
 use crate::services::rails::{default_availability, default_rail_configs, RailContext};
 
 /// Configuración del servicio Gateway.
@@ -19,8 +20,12 @@ pub struct AppConfig {
     pub oracle_timeout_secs: u64,
     /// Verifica `GET /health` del Oracle al arranque.
     pub oracle_health_check: bool,
-    /// Comercio por defecto hasta auth API key (paso 4.11).
+    /// Comercio por defecto cuando se usa `GATEWAY_TEST_API_KEY`.
     pub default_merchant_id: MerchantId,
+    /// Pares `sk_*:merchant_uuid` desde `GATEWAY_MERCHANT_API_KEYS`.
+    pub merchant_api_keys: Vec<MerchantApiKeyEntry>,
+    /// Atajo dev: una sola API key de prueba (`sk_test_...`).
+    pub bootstrap_test_api_key: Option<String>,
     /// Preferencia de riel del comercio cuando el checkout no la indica.
     pub merchant_default_funding_type: Option<FundingType>,
     /// Habilita fallback automático D3 en Rail Switcher.
@@ -58,6 +63,15 @@ impl AppConfig {
             .map(MerchantId::new)
             .unwrap_or_else(|| MerchantId::new(Uuid::new_v4()));
 
+        let merchant_api_keys = env::var("GATEWAY_MERCHANT_API_KEYS")
+            .ok()
+            .map(|raw| parse_merchant_api_keys(&raw))
+            .transpose()
+            .context("GATEWAY_MERCHANT_API_KEYS inválido")?
+            .unwrap_or_default();
+
+        let bootstrap_test_api_key = env::var("GATEWAY_TEST_API_KEY").ok();
+
         let merchant_default_funding_type = env::var("GATEWAY_DEFAULT_FUNDING_TYPE")
             .ok()
             .and_then(|raw| parse_funding_type(&raw));
@@ -75,6 +89,8 @@ impl AppConfig {
             oracle_timeout_secs,
             oracle_health_check,
             default_merchant_id,
+            merchant_api_keys,
+            bootstrap_test_api_key,
             merchant_default_funding_type,
             rail_fallback_enabled,
             rail_configs,
@@ -95,6 +111,34 @@ impl AppConfig {
     /// Dirección de escucha `host:port`.
     pub fn listen_addr(&self) -> String {
         format!("{}:{}", self.host, self.port)
+    }
+
+    /// Construye el registro de comercios desde la configuración cargada.
+    pub fn build_merchant_registry(
+        &self,
+    ) -> Result<crate::services::merchant::MerchantRegistry, crate::services::merchant::MerchantRegistryError>
+    {
+        use crate::services::merchant::{ApiKeyMode, MerchantRegistry, MerchantRegistryError};
+
+        let registry = MerchantRegistry::default();
+
+        if !self.merchant_api_keys.is_empty() {
+            for entry in &self.merchant_api_keys {
+                registry.register(
+                    entry.api_key.clone(),
+                    entry.merchant_id,
+                    entry.mode,
+                );
+            }
+            return Ok(registry);
+        }
+
+        if let Some(api_key) = &self.bootstrap_test_api_key {
+            registry.register(api_key.clone(), self.default_merchant_id, ApiKeyMode::Test);
+            return Ok(registry);
+        }
+
+        Err(MerchantRegistryError::MissingMerchantKeys)
     }
 }
 
@@ -226,6 +270,19 @@ mod tests {
                     .find(|entry| entry.funding_type == FundingType::TraditionalBank)
                     .expect("bank config");
                 assert!(!bank.enabled);
+            });
+        });
+    }
+
+    #[test]
+    fn build_merchant_registry_from_test_api_key() {
+        let _guard = ENV_LOCK.lock().expect("env lock");
+        clear_optional_gateway_env();
+        with_env("ORACLE_API_KEY", "test-key", || {
+            with_env("GATEWAY_TEST_API_KEY", "sk_test_validkey1", || {
+                let config = AppConfig::from_env().expect("config");
+                let registry = config.build_merchant_registry().expect("registry");
+                assert!(registry.authenticate("sk_test_validkey1").is_ok());
             });
         });
     }

@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use domain::{FundingType, MerchantId, TransactionStatus};
+use domain::{FundingType, TransactionStatus};
 use oracle_client::{HttpOracleClient, OracleClient};
 use rail_switcher::RailSwitcher;
 use settlement_adapters::SettlementEngine;
@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::config::AppConfig;
 use crate::services::idempotency::IdempotencyStore;
+use crate::services::merchant::MerchantRegistry;
 use crate::services::rails::RailContext;
 
 /// Registro en memoria de una transacción (persistencia real en paso 4.12).
@@ -29,7 +30,7 @@ pub struct AppState {
     pub oracle_client: Arc<dyn OracleClient>,
     pub rail_switcher: RailSwitcher,
     pub rail_context: RailContext,
-    pub default_merchant_id: MerchantId,
+    pub merchant_registry: Arc<MerchantRegistry>,
     transactions: Arc<RwLock<HashMap<Uuid, TransactionRecord>>>,
     idempotency: Arc<IdempotencyStore>,
 }
@@ -39,7 +40,10 @@ impl AppState {
     ///
     /// Verifica conectividad con el Oracle (`GET /health`) si
     /// `GATEWAY_ORACLE_HEALTH_CHECK` está activo.
-    pub async fn new(config: Arc<AppConfig>) -> Result<Self, oracle_client::OracleClientError> {
+    pub async fn new(
+        config: Arc<AppConfig>,
+        merchant_registry: Arc<MerchantRegistry>,
+    ) -> Result<Self, oracle_client::OracleClientError> {
         let oracle_client = Arc::new(HttpOracleClient::new(
             config.oracle_base_url.clone(),
             config.oracle_api_key.clone(),
@@ -56,6 +60,7 @@ impl AppState {
             SettlementEngine::with_stub_adapters(),
             RailSwitcher,
             config.rail_context(),
+            merchant_registry,
         ))
     }
 
@@ -66,14 +71,15 @@ impl AppState {
         settlement_engine: SettlementEngine,
         rail_switcher: RailSwitcher,
         rail_context: RailContext,
+        merchant_registry: Arc<MerchantRegistry>,
     ) -> Self {
         Self {
-            default_merchant_id: config.default_merchant_id,
             config,
             settlement_engine,
             oracle_client,
             rail_switcher,
             rail_context,
+            merchant_registry,
             transactions: Arc::new(RwLock::new(HashMap::new())),
             idempotency: Arc::new(IdempotencyStore::default()),
         }

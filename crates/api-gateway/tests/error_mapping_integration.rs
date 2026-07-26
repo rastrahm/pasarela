@@ -1,5 +1,7 @@
 //! Tests de integración del mapeo HTTP §6.2 (401, 402, 422, 503, 500).
 
+mod common;
+
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -8,7 +10,7 @@ use axum::http::{Request, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::post;
 use axum::{Json, Router};
-use domain::{FundingType, LiquidityError, MerchantId, SettlementReceipt};
+use domain::{FundingType, LiquidityError, SettlementReceipt};
 use http_body_util::BodyExt;
 use oracle_client::{error_codes, AuthorizeResponse, ErrorResponse};
 use rail_switcher::{RailAvailability, RailSwitcher};
@@ -19,11 +21,11 @@ use uuid::Uuid;
 
 use api_gateway::{
     build_app,
-    config::AppConfig,
     error::codes,
-    services::{rails::default_rail_configs, RailContext, IDEMPOTENCY_KEY_HEADER},
+    services::{RailContext, IDEMPOTENCY_KEY_HEADER},
     state::AppState,
 };
+use common::{bearer_header, test_app_config, test_merchant_id, test_merchant_registry};
 
 struct FailingSettlementAdapter;
 
@@ -75,28 +77,13 @@ async fn spawn_oracle(status: StatusCode, error: Option<ErrorResponse>) -> Strin
     format!("http://{addr}")
 }
 
-fn base_config(oracle_url: String) -> Arc<AppConfig> {
-    Arc::new(AppConfig {
-        host: "127.0.0.1".to_string(),
-        port: 8080,
-        oracle_base_url: oracle_url,
-        oracle_api_key: "test-key".to_string(),
-        oracle_timeout_secs: 2,
-        oracle_health_check: false,
-        default_merchant_id: MerchantId::new(Uuid::new_v4()),
-        merchant_default_funding_type: None,
-        rail_fallback_enabled: true,
-        rail_configs: default_rail_configs(),
-        database_url: None,
-    })
-}
-
 async fn state_with_parts(
     oracle_url: String,
     rail_context: RailContext,
     settlement_engine: SettlementEngine,
 ) -> AppState {
-    let config = base_config(oracle_url);
+    let merchant_id = test_merchant_id();
+    let config = test_app_config(oracle_url, merchant_id);
     let oracle_client = Arc::new(
         oracle_client::HttpOracleClient::new(
             config.oracle_base_url.clone(),
@@ -112,18 +99,23 @@ async fn state_with_parts(
         settlement_engine,
         RailSwitcher,
         rail_context,
+        test_merchant_registry(merchant_id),
     )
 }
 
 async fn checkout(app: axum::Router, body: &str) -> (StatusCode, serde_json::Value) {
+    let mut builder = Request::builder()
+        .method("POST")
+        .uri("/api/v1/checkout")
+        .header("content-type", "application/json")
+        .header("x-forwarded-for", "127.0.0.1")
+        .header(IDEMPOTENCY_KEY_HEADER, "error-map-test-key");
+    let (auth_key, auth_value) = bearer_header();
+    builder = builder.header(auth_key, auth_value);
+
     let response = app
         .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/v1/checkout")
-                .header("content-type", "application/json")
-                .header("x-forwarded-for", "127.0.0.1")
-                .header(IDEMPOTENCY_KEY_HEADER, "error-map-test-key")
+            builder
                 .body(Body::from(body.to_string()))
                 .expect("request"),
         )

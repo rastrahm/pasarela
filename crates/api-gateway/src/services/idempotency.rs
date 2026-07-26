@@ -159,10 +159,10 @@ pub fn request_fingerprint(request: &CheckoutRequest) -> Result<String, GatewayE
 /// Ejecuta checkout con idempotencia por comercio + clave (UC-01 / D9).
 pub async fn process_checkout_idempotent(
     state: &AppState,
+    merchant_id: MerchantId,
     idempotency_key: String,
     input: CheckoutInput,
 ) -> Result<CheckoutResponse, GatewayError> {
-    let merchant_id = state.default_merchant_id;
     let fingerprint = request_fingerprint(&input.request)?;
 
     if let Some(cached) = state
@@ -198,7 +198,7 @@ mod tests {
     use crate::config::AppConfig;
     use crate::routes::CheckoutCardPayload;
     use crate::services::rails::default_rail_configs;
-    use crate::services::RailContext;
+    use crate::services::{MerchantRegistry, RailContext};
     use crate::state::AppState;
 
     struct CountingOracle {
@@ -257,7 +257,8 @@ mod tests {
         }
     }
 
-    fn test_state(calls: Arc<std::sync::atomic::AtomicUsize>) -> AppState {
+    fn test_state(calls: Arc<std::sync::atomic::AtomicUsize>) -> (AppState, MerchantId) {
+        let merchant_id = MerchantId::new(Uuid::new_v4());
         let config = Arc::new(AppConfig {
             host: "127.0.0.1".to_string(),
             port: 8080,
@@ -265,20 +266,24 @@ mod tests {
             oracle_api_key: "key".to_string(),
             oracle_timeout_secs: 2,
             oracle_health_check: false,
-            default_merchant_id: MerchantId::new(Uuid::new_v4()),
+            default_merchant_id: merchant_id,
+            merchant_api_keys: vec![],
+            bootstrap_test_api_key: None,
             merchant_default_funding_type: None,
             rail_fallback_enabled: true,
             rail_configs: default_rail_configs(),
             database_url: None,
         });
 
-        AppState::from_parts(
+        let state = AppState::from_parts(
             config,
             Arc::new(CountingOracle { calls }),
             SettlementEngine::with_stub_adapters(),
             RailSwitcher,
             RailContext::default(),
-        )
+            Arc::new(MerchantRegistry::single("sk_test_validkey1", merchant_id)),
+        );
+        (state, merchant_id)
     }
 
     #[test]
@@ -303,16 +308,17 @@ mod tests {
     #[tokio::test]
     async fn replays_success_without_second_oracle_call() {
         let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        let state = test_state(calls.clone());
+        let (state, merchant_id) = test_state(calls.clone());
         let input = CheckoutInput {
+            merchant_id,
             request: sample_request(),
             caller_ip: Some("127.0.0.1".to_string()),
         };
 
-        let first = process_checkout_idempotent(&state, "key-1".to_string(), input.clone())
+        let first = process_checkout_idempotent(&state, merchant_id, "key-1".to_string(), input.clone())
             .await
             .expect("first");
-        let second = process_checkout_idempotent(&state, "key-1".to_string(), input)
+        let second = process_checkout_idempotent(&state, merchant_id, "key-1".to_string(), input)
             .await
             .expect("second");
 
@@ -323,12 +329,14 @@ mod tests {
     #[tokio::test]
     async fn rejects_same_key_with_different_payload() {
         let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        let state = test_state(calls);
+        let (state, merchant_id) = test_state(calls);
 
         process_checkout_idempotent(
             &state,
+            merchant_id,
             "key-2".to_string(),
             CheckoutInput {
+                merchant_id,
                 request: sample_request(),
                 caller_ip: None,
             },
@@ -340,8 +348,10 @@ mod tests {
         different.amount = 200.0;
         let err = process_checkout_idempotent(
             &state,
+            merchant_id,
             "key-2".to_string(),
             CheckoutInput {
+                merchant_id,
                 request: different,
                 caller_ip: None,
             },

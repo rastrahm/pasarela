@@ -19,6 +19,7 @@ use crate::state::{AppState, TransactionRecord};
 /// Parámetros de una solicitud de checkout entrante.
 #[derive(Clone)]
 pub struct CheckoutInput {
+    pub merchant_id: domain::MerchantId,
     pub request: CheckoutRequest,
     pub caller_ip: Option<String>,
 }
@@ -30,7 +31,7 @@ pub async fn process_checkout(
 ) -> Result<CheckoutResponse, GatewayError> {
     let (amount, currency) = parse_amount_and_currency(&input.request)?;
     let transaction_id = TransactionId::generate();
-    let merchant_id = state.default_merchant_id;
+    let merchant_id = input.merchant_id;
 
     let rail = select_rail(
         &state.rail_switcher,
@@ -169,7 +170,8 @@ mod tests {
     use super::*;
     use crate::config::AppConfig;
     use crate::routes::CheckoutCardPayload;
-    use crate::services::RailContext;
+    use crate::services::rails::default_rail_configs;
+    use crate::services::{MerchantRegistry, RailContext};
     use crate::state::AppState;
 
     struct MockOracle {
@@ -233,7 +235,8 @@ mod tests {
         }
     }
 
-    fn test_state(oracle: Arc<dyn OracleClient>) -> AppState {
+    fn test_state(oracle: Arc<dyn OracleClient>) -> (AppState, domain::MerchantId) {
+        let merchant_id = MerchantId::new(Uuid::new_v4());
         let config = Arc::new(AppConfig {
             host: "127.0.0.1".to_string(),
             port: 8080,
@@ -242,24 +245,28 @@ mod tests {
             oracle_timeout_secs: 2,
             oracle_health_check: false,
             database_url: None,
-            default_merchant_id: MerchantId::new(Uuid::new_v4()),
+            default_merchant_id: merchant_id,
+            merchant_api_keys: vec![],
+            bootstrap_test_api_key: None,
             merchant_default_funding_type: None,
             rail_fallback_enabled: true,
-            rail_configs: crate::services::rails::default_rail_configs(),
+            rail_configs: default_rail_configs(),
         });
-        AppState::from_parts(
+        let state = AppState::from_parts(
             config,
             oracle,
             SettlementEngine::with_stub_adapters(),
             RailSwitcher,
             RailContext::default(),
-        )
+            Arc::new(MerchantRegistry::single("sk_test_validkey1", merchant_id)),
+        );
+        (state, merchant_id)
     }
 
     #[tokio::test]
     async fn checkout_happy_path_returns_settled() {
         let release_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let state = test_state(Arc::new(MockOracle {
+        let (state, merchant_id) = test_state(Arc::new(MockOracle {
             authorize_ok: true,
             release_called: release_flag.clone(),
         }));
@@ -267,6 +274,7 @@ mod tests {
         let response = process_checkout(
             &state,
             CheckoutInput {
+                merchant_id,
                 request: sample_request(),
                 caller_ip: Some("127.0.0.1".to_string()),
             },
@@ -282,7 +290,7 @@ mod tests {
 
     #[tokio::test]
     async fn checkout_maps_oracle_invalid_card_to_422() {
-        let state = test_state(Arc::new(MockOracle {
+        let (state, merchant_id) = test_state(Arc::new(MockOracle {
             authorize_ok: false,
             release_called: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }));
@@ -290,6 +298,7 @@ mod tests {
         let err = process_checkout(
             &state,
             CheckoutInput {
+                merchant_id,
                 request: sample_request(),
                 caller_ip: None,
             },
@@ -302,7 +311,7 @@ mod tests {
 
     #[tokio::test]
     async fn checkout_rejects_invalid_amount() {
-        let state = test_state(Arc::new(MockOracle {
+        let (state, merchant_id) = test_state(Arc::new(MockOracle {
             authorize_ok: true,
             release_called: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }));
@@ -313,6 +322,7 @@ mod tests {
         let err = process_checkout(
             &state,
             CheckoutInput {
+                merchant_id,
                 request,
                 caller_ip: None,
             },
