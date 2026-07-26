@@ -16,6 +16,12 @@ pub enum AppError {
 
     #[error("moneda no soportada")]
     UnsupportedCurrency,
+
+    #[error("fondos insuficientes")]
+    InsufficientFunds,
+
+    #[error("monto inválido")]
+    InvalidAmount,
 }
 
 impl AppError {
@@ -23,6 +29,8 @@ impl AppError {
         match self {
             Self::Unauthorized => StatusCode::UNAUTHORIZED,
             Self::UnsupportedCurrency => StatusCode::BAD_REQUEST,
+            Self::InsufficientFunds => StatusCode::PAYMENT_REQUIRED,
+            Self::InvalidAmount => StatusCode::UNPROCESSABLE_ENTITY,
         }
     }
 
@@ -30,6 +38,8 @@ impl AppError {
         match self {
             Self::Unauthorized => "UNAUTHORIZED",
             Self::UnsupportedCurrency => "UNSUPPORTED_CURRENCY",
+            Self::InsufficientFunds => "INSUFFICIENT_FUNDS",
+            Self::InvalidAmount => "INVALID_AMOUNT",
         }
     }
 }

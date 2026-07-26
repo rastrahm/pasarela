@@ -10,14 +10,14 @@ use axum::{
     response::Response,
 };
 
-use crate::config::AppConfig;
 use crate::error::AppError;
+use crate::state::AppState;
 
 const API_KEY_HEADER: &str = "x-api-key";
 
 /// Valida `X-API-KEY` en rutas internas (fail closed).
 pub async fn require_api_key(
-    State(config): State<Arc<AppConfig>>,
+    State(state): State<Arc<AppState>>,
     request: Request<Body>,
     next: Next,
 ) -> Result<Response, AppError> {
@@ -27,7 +27,7 @@ pub async fn require_api_key(
         .and_then(|value| value.to_str().ok())
         .unwrap_or("");
 
-    if provided.is_empty() || provided != config.api_key {
+    if provided.is_empty() || provided != state.config.api_key {
         return Err(AppError::Unauthorized);
     }
 

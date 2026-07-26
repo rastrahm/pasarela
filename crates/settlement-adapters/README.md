@@ -9,7 +9,7 @@ Adaptadores de liquidación por riel — **Strategy pattern** (Fase 4, paso 4.1)
 | Adaptador | Riel | Prueba de asentamiento | Paso |
 |-----------|------|------------------------|------|
 | `TraditionalBankAdapter` | `TraditionalBank` | Referencia bancaria (ISO 20022 / ACH) | ✅ 4.2 |
-| `BinanceCexAdapter` | `BinanceCex` | ID de orden CEX | 4.3 |
+| `BinanceCexAdapter` | `BinanceCex` | ID de orden CEX | ✅ 4.3 |
 | `SolanaWalletAdapter` | `SolanaWallet` | Tx signature on-chain | 4.4 |
 
 ## Uso
