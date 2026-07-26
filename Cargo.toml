@@ -9,6 +9,7 @@ resolver = "2"
 members = [
     "crates/domain",
     "crates/rail-switcher",
+    "crates/settlement-adapters",
     "crates/oracle-client",
     "oracle",
     "antifraud",

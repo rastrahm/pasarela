@@ -1816,6 +1816,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "settlement-adapters"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "domain",
+ "thiserror 1.0.69",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "sha1"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
