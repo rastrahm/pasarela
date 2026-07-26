@@ -1,8 +1,4 @@
-/** Cuerpo de error JSON del Gateway (`ErrorResponse`). */
-export interface GatewayErrorBody {
-  error_code: string
-  message: string
-}
+import type { GatewayErrorResponse } from '../schemas/gateway'
 
 /** Error de red o HTTP al invocar el Gateway. */
 export class GatewayApiError extends Error {
@@ -22,7 +18,7 @@ export class GatewayApiError extends Error {
  */
 export function resolveGatewayErrorMessage(
   status: number,
-  body?: Partial<GatewayErrorBody>,
+  body?: Partial<GatewayErrorResponse>,
 ): string {
   switch (status) {
     case 402:
@@ -40,16 +36,5 @@ export function resolveGatewayErrorMessage(
       return body?.message ?? 'Conflicto de idempotencia. Reintentá con otra clave.'
     default:
       return body?.message ?? 'Error al procesar el checkout.'
-  }
-}
-
-/** Parsea el cuerpo de error del Gateway si viene como JSON. */
-export async function parseGatewayErrorBody(
-  response: Response,
-): Promise<Partial<GatewayErrorBody>> {
-  try {
-    return (await response.json()) as Partial<GatewayErrorBody>
-  } catch {
-    return {}
   }
 }

@@ -3,13 +3,17 @@ import { describe, expect, it, beforeEach } from 'vitest'
 import type { FundingType } from './funding'
 import {
   buildCheckoutLogEntries,
-  checkoutResultSchema,
   createLogEntry,
   getSettlementProofLabel,
   getStatusLabel,
   resetLogSequenceForTests,
   TRANSACTION_LOG_MESSAGES,
 } from './transaction'
+import {
+  GATEWAY_CHECKOUT_RESPONSE_FIXTURE,
+  checkoutResponseSchema,
+  parseCheckoutResponse,
+} from './gateway'
 
 describe('transaction schema', () => {
   beforeEach(() => {
@@ -17,20 +21,17 @@ describe('transaction schema', () => {
   })
 
   it('valida una respuesta de checkout del Gateway', () => {
-    const payload = {
-      transaction_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      status: 'settled',
-      rail_used: 'traditional_bank',
-      settlement_proof: 'ACH-MEM-001',
-    }
-
-    expect(checkoutResultSchema.safeParse(payload).success).toBe(true)
+    expect(
+      checkoutResponseSchema.safeParse(GATEWAY_CHECKOUT_RESPONSE_FIXTURE).success,
+    ).toBe(true)
+    expect(parseCheckoutResponse(GATEWAY_CHECKOUT_RESPONSE_FIXTURE).status).toBe(
+      'settled',
+    )
   })
 
   it('genera entradas de log para checkout exitoso', () => {
     const entries = buildCheckoutLogEntries({
-      transaction_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      status: 'settled',
+      ...GATEWAY_CHECKOUT_RESPONSE_FIXTURE,
       rail_used: 'binance_cex',
       settlement_proof: 'CEX-MEM-001',
     })

@@ -1,13 +1,20 @@
 import { API_BASE_URL, GATEWAY_API_KEY } from '../config/env'
-import { type CheckoutRequest } from '../schemas/checkout'
-import { checkoutResultSchema, type CheckoutResult } from '../schemas/transaction'
+import {
+  parseCheckoutResponse,
+  parseGatewayErrorResponse,
+  parseHealthResponse,
+  parseTransactionResponse,
+  toCheckoutRequestBody,
+  type CheckoutRequest,
+  type CheckoutResponse,
+  type TransactionResponse,
+} from '../schemas/gateway'
 import {
   GatewayApiError,
-  parseGatewayErrorBody,
   resolveGatewayErrorMessage,
 } from './errors'
 
-export interface SubmitCheckoutOptions {
+export interface GatewayClientOptions {
   baseUrl?: string
   apiKey?: string
   idempotencyKey?: string
@@ -18,17 +25,39 @@ export function createIdempotencyKey(): string {
   return crypto.randomUUID()
 }
 
+function resolveClientOptions(options: GatewayClientOptions = {}) {
+  return {
+    baseUrl: options.baseUrl ?? API_BASE_URL,
+    apiKey: options.apiKey ?? GATEWAY_API_KEY,
+    idempotencyKey: options.idempotencyKey ?? createIdempotencyKey(),
+  }
+}
+
+async function parseErrorResponse(response: Response): Promise<GatewayApiError> {
+  let body: ReturnType<typeof parseGatewayErrorResponse> | undefined
+  try {
+    const json: unknown = await response.json()
+    body = parseGatewayErrorResponse(json)
+  } catch {
+    body = undefined
+  }
+
+  return new GatewayApiError(
+    resolveGatewayErrorMessage(response.status, body),
+    response.status,
+    body?.error_code,
+  )
+}
+
 /**
  * Envía checkout al API Gateway (`POST /api/v1/checkout`).
  * El frontend nunca llama al Oracle directamente.
  */
 export async function submitCheckout(
   request: CheckoutRequest,
-  options: SubmitCheckoutOptions = {},
-): Promise<CheckoutResult> {
-  const baseUrl = options.baseUrl ?? API_BASE_URL
-  const apiKey = options.apiKey ?? GATEWAY_API_KEY
-  const idempotencyKey = options.idempotencyKey ?? createIdempotencyKey()
+  options: GatewayClientOptions = {},
+): Promise<CheckoutResponse> {
+  const { baseUrl, apiKey, idempotencyKey } = resolveClientOptions(options)
 
   const response = await fetch(`${baseUrl}/api/v1/checkout`, {
     method: 'POST',
@@ -37,23 +66,49 @@ export async function submitCheckout(
       'Content-Type': 'application/json',
       'Idempotency-Key': idempotencyKey,
     },
-    body: JSON.stringify({
-      amount: request.amount,
-      currency: request.currency,
-      funding_type: request.funding_type,
-      card: request.card,
-    }),
+    body: JSON.stringify(toCheckoutRequestBody(request)),
   })
 
   if (!response.ok) {
-    const body = await parseGatewayErrorBody(response)
-    throw new GatewayApiError(
-      resolveGatewayErrorMessage(response.status, body),
-      response.status,
-      body.error_code,
-    )
+    throw await parseErrorResponse(response)
   }
 
   const json: unknown = await response.json()
-  return checkoutResultSchema.parse(json)
+  return parseCheckoutResponse(json)
+}
+
+/** Consulta una transacción (`GET /api/v1/transactions/{id}`). */
+export async function fetchTransaction(
+  transactionId: string,
+  options: Omit<GatewayClientOptions, 'idempotencyKey'> = {},
+): Promise<TransactionResponse> {
+  const { baseUrl, apiKey } = resolveClientOptions(options)
+
+  const response = await fetch(`${baseUrl}/api/v1/transactions/${transactionId}`, {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw await parseErrorResponse(response)
+  }
+
+  const json: unknown = await response.json()
+  return parseTransactionResponse(json)
+}
+
+/** Healthcheck del Gateway (`GET /health`). */
+export async function fetchGatewayHealth(
+  options: Pick<GatewayClientOptions, 'baseUrl'> = {},
+): Promise<{ status: string; service: string }> {
+  const baseUrl = options.baseUrl ?? API_BASE_URL
+
+  const response = await fetch(`${baseUrl}/health`)
+  if (!response.ok) {
+    throw await parseErrorResponse(response)
+  }
+
+  const json: unknown = await response.json()
+  return parseHealthResponse(json)
 }

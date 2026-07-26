@@ -1,4 +1,4 @@
-import type { CheckoutResult } from '../schemas/transaction'
+import type { CheckoutResponse } from '../schemas/gateway'
 import {
   getRailLabel,
   getSettlementProofLabel,
@@ -10,7 +10,7 @@ export interface TransactionViewerProps {
   /** Entradas del log en orden cronológico. */
   entries: TransactionLogEntry[]
   /** Resultado final del checkout, si ya está disponible. */
-  result?: CheckoutResult | null
+  result?: CheckoutResponse | null
   /** Mensaje cuando aún no hay entradas. */
   emptyMessage?: string
 }

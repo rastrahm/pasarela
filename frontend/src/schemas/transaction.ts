@@ -1,17 +1,8 @@
-import { z } from 'zod'
+import type { CheckoutResponse } from './gateway'
+import type { TransactionStatus } from './gateway'
+import { RAIL_OPTIONS, type FundingType } from './funding'
 
-import { fundingTypeSchema, RAIL_OPTIONS, type FundingType } from './funding'
-
-export const transactionStatusSchema = z.enum([
-  'pending',
-  'authorized',
-  'held',
-  'settled',
-  'failed',
-  'reversed',
-])
-
-export type TransactionStatus = z.infer<typeof transactionStatusSchema>
+export type { TransactionStatus } from './gateway'
 
 export type LogLevel = 'info' | 'success' | 'warning' | 'error'
 
@@ -21,21 +12,6 @@ export interface TransactionLogEntry {
   level: LogLevel
   message: string
 }
-
-/** Respuesta de checkout alineada con `CheckoutResponse` del Gateway. */
-export interface CheckoutResult {
-  transaction_id: string
-  status: TransactionStatus
-  rail_used: FundingType
-  settlement_proof: string | null
-}
-
-export const checkoutResultSchema = z.object({
-  transaction_id: z.string().uuid(),
-  status: transactionStatusSchema,
-  rail_used: fundingTypeSchema,
-  settlement_proof: z.string().nullable(),
-})
 
 /** Mensajes estándar del flujo UC-10. */
 export const TRANSACTION_LOG_MESSAGES = {
@@ -99,7 +75,7 @@ export function getStatusLabel(status: TransactionStatus): string {
 }
 
 /** Genera entradas de log a partir del resultado final de checkout. */
-export function buildCheckoutLogEntries(result: CheckoutResult): TransactionLogEntry[] {
+export function buildCheckoutLogEntries(result: CheckoutResponse): TransactionLogEntry[] {
   const railLabel = getRailLabel(result.rail_used)
   const entries: TransactionLogEntry[] = [
     createLogEntry(TRANSACTION_LOG_MESSAGES.validatingCard),

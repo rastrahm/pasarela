@@ -7,11 +7,11 @@ import { RailSelector } from '../components/RailSelector'
 import { TransactionViewer } from '../components/TransactionViewer'
 import { useTransactionLog } from '../hooks/useTransactionLog'
 import { parseCheckoutRequest } from '../schemas/checkout'
+import type { CheckoutResponse } from '../schemas/gateway'
 import type { CardPayload } from '../schemas/card'
 import { DEFAULT_FUNDING_TYPE, type FundingType } from '../schemas/funding'
 import {
   getRailLabel,
-  type CheckoutResult,
   TRANSACTION_LOG_MESSAGES,
 } from '../schemas/transaction'
 
@@ -26,7 +26,7 @@ export function CheckoutPage() {
   const [currency] = useState(DEFAULT_CURRENCY)
   const [card, setCard] = useState<CardPayload | null>(null)
   const [fundingType, setFundingType] = useState<FundingType>(DEFAULT_FUNDING_TYPE)
-  const [checkoutResult, setCheckoutResult] = useState<CheckoutResult | null>(null)
+  const [checkoutResult, setCheckoutResult] = useState<CheckoutResponse | null>(null)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { entries, append, clear } = useTransactionLog()

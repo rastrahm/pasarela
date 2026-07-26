@@ -4,12 +4,12 @@ import {
   buildCheckoutLogEntries,
   createLogEntry,
   resetLogSequenceForTests,
-  type CheckoutResult,
 } from '../schemas/transaction'
+import type { CheckoutResponse } from '../schemas/gateway'
 import { TransactionViewer } from './TransactionViewer'
 import { renderUi, screen } from '../test/test-utils'
 
-const SETTLED_RESULT: CheckoutResult = {
+const SETTLED_RESULT: CheckoutResponse = {
   transaction_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
   status: 'settled',
   rail_used: 'traditional_bank',
@@ -56,7 +56,7 @@ describe('TransactionViewer', () => {
   })
 
   it('muestra Tx Signature para Solana', () => {
-    const solanaResult: CheckoutResult = {
+    const solanaResult: CheckoutResponse = {
       ...SETTLED_RESULT,
       rail_used: 'solana_wallet',
       settlement_proof: 'SOL-MEM-5xK9abc',
