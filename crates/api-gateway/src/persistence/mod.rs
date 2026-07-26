@@ -51,10 +51,14 @@ impl GatewayStore {
         }
     }
 
-    pub async fn get_transaction(&self, id: Uuid) -> Result<Option<TransactionRecord>, PersistenceError> {
+    pub async fn get_transaction(
+        &self,
+        id: Uuid,
+        merchant_id: MerchantId,
+    ) -> Result<Option<TransactionRecord>, PersistenceError> {
         match self {
-            Self::Memory(store) => store.get_transaction(id),
-            Self::Postgres(store) => store.get_transaction(id).await,
+            Self::Memory(store) => store.get_transaction(id, merchant_id),
+            Self::Postgres(store) => store.get_transaction(id, merchant_id).await,
         }
     }
 

@@ -6,13 +6,14 @@ use crate::error::GatewayError;
 use crate::routes::TransactionResponse;
 use crate::state::AppState;
 
-/// Busca una transacción por ID en el repositorio del Gateway.
+/// Busca una transacción por ID restringida al comercio autenticado (UC-09).
 pub async fn lookup_transaction(
     state: &AppState,
+    merchant_id: domain::MerchantId,
     transaction_id: Uuid,
 ) -> Result<TransactionResponse, GatewayError> {
     let record = state
-        .get_transaction(transaction_id)
+        .get_transaction(transaction_id, merchant_id)
         .await
         .map_err(|err| GatewayError::Internal(err.to_string()))?
         .ok_or(GatewayError::NotFound)?;
@@ -124,7 +125,7 @@ mod tests {
             .await
             .expect("saved");
 
-        let response = lookup_transaction(&state, tx_id).await.expect("found");
+        let response = lookup_transaction(&state, merchant_id, tx_id).await.expect("found");
         assert_eq!(response.transaction_id, tx_id);
         assert_eq!(response.status, TransactionStatus::Settled);
         assert_eq!(response.rail_used, Some(FundingType::TraditionalBank));
@@ -134,7 +135,7 @@ mod tests {
     #[tokio::test]
     async fn returns_not_found_for_unknown_id() {
         let state = test_state();
-        let err = lookup_transaction(&state, Uuid::new_v4())
+        let err = lookup_transaction(&state, MerchantId::new(Uuid::new_v4()), Uuid::new_v4())
             .await
             .expect_err("missing");
         assert!(matches!(err, GatewayError::NotFound));

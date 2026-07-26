@@ -79,6 +79,7 @@ Estructura de tests de integración:
 |---------|---------|
 | `e2e_integration.rs` | Gate Fase 4 — flujo completo (mock Oracle) |
 | `cross_service_integration.rs` | Fase 6.2 — Gateway + Oracle real (PostgreSQL) |
+| `security_integration.rs` | Fase 6.4 — IDOR, PCI idempotency |
 | `checkout_integration.rs` | Checkout + auth |
 | `rail_oracle_integration.rs` | Rail Switcher + Oracle |
 | `hold_release_integration.rs` | Liberación de hold UC-04 |

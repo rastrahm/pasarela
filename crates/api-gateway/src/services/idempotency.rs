@@ -67,8 +67,34 @@ pub fn extract_idempotency_key(headers: &HeaderMap) -> Result<String, GatewayErr
 }
 
 /// Huella estable del payload de checkout para detectar reutilización conflictiva.
+///
+/// Excluye PAN, CVV y titular (PCI simulado §9.6); usa hash SHA-256 del PAN.
 pub fn request_fingerprint(request: &CheckoutRequest) -> Result<String, GatewayError> {
-    serde_json::to_string(request)
+    use sha2::{Digest, Sha256};
+
+    let pan_digits: String = request
+        .card
+        .pan
+        .chars()
+        .filter(|ch| ch.is_ascii_digit())
+        .collect();
+    let pan_hash = format!("{:x}", Sha256::digest(pan_digits.as_bytes()));
+
+    let last_four: String = pan_digits.chars().rev().take(4).collect::<String>().chars().rev().collect();
+
+    let safe = serde_json::json!({
+        "amount": request.amount,
+        "currency": request.currency,
+        "funding_type": request.funding_type,
+        "card": {
+            "pan_hash": pan_hash,
+            "last_four": last_four,
+            "expiry_month": request.card.expiry_month,
+            "expiry_year": request.card.expiry_year,
+        }
+    });
+
+    serde_json::to_string(&safe)
         .map_err(|err| GatewayError::Internal(format!("fingerprint checkout: {err}")))
 }
 
@@ -204,6 +230,18 @@ mod tests {
             Arc::new(MerchantRegistry::single("sk_test_validkey1", merchant_id)),
         );
         (state, merchant_id)
+    }
+
+    #[test]
+    fn request_fingerprint_excludes_pan_cvv_and_cardholder() {
+        let request = sample_request();
+        let fingerprint = request_fingerprint(&request).expect("fingerprint");
+
+        assert!(!fingerprint.contains("4111111111111111"));
+        assert!(!fingerprint.contains("123"));
+        assert!(!fingerprint.contains("Test"));
+        assert!(fingerprint.contains("pan_hash"));
+        assert!(fingerprint.contains("last_four"));
     }
 
     #[test]

@@ -202,6 +202,30 @@
 | DT-P3-04 | Pantalla UC-09 consulta transacción | Feature nueva; `fetchTransaction` ya existe en API |
 | DT-P3-05 | Dashboard admin | Fuera de alcance MVP (Acta Fase 5 §7) |
 
+### SEC-6.4-01 — IDOR consulta transacciones
+
+| Campo | Valor |
+|-------|-------|
+| **Estado** | **Resuelto** (2026-07-26) |
+| **Fix** | Filtro `merchant_id` en `GET /api/v1/transactions/:id` |
+| **Test** | `security_integration.rs` |
+
+### SEC-6.4-02 — PAN en fingerprint idempotencia
+
+| Campo | Valor |
+|-------|-------|
+| **Estado** | **Resuelto** (2026-07-26) |
+| **Fix** | `request_fingerprint` sin PAN/CVV; SHA-256 del PAN |
+| **Test** | `idempotency.rs` unit + `security_integration.rs` |
+
+### SEC-C-03 — API key comercio en bundle frontend
+
+| Campo | Valor |
+|-------|-------|
+| **Estado** | Aceptado MVP demo |
+| **Evidencia** | `frontend/src/config/env.ts` — `VITE_GATEWAY_API_KEY` |
+| **Plan** | Fase 7 BFF; ver [Revision-Seguridad-Fase-6.md](./Revision-Seguridad-Fase-6.md) |
+
 ---
 
 ## 7. Deuda documentada en actas y arquitectura
@@ -246,7 +270,7 @@
 
 | Fecha | Cambio |
 |-------|--------|
-| 2026-07-26 | Checklist QA Fase 6 — [Checklist-QA-Fase-6.md](./Checklist-QA-Fase-6.md) |
+| 2026-07-26 | Revisión seguridad 6.4 — [Revision-Seguridad-Fase-6.md](./Revision-Seguridad-Fase-6.md); fixes IDOR + idempotency PCI |
 | 2026-07-26 | DT-P0-01 mitigado — `cross_service_integration.rs` + `oracle/src/test_support.rs` |
 
 ---
