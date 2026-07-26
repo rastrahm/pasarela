@@ -90,7 +90,8 @@ Variables de entorno: [`.env.example`](.env.example) (`SOLANA_RPC_URL`, `PAYMENT
 |------|------------|
 | 3.9 | ✅ Devnet — `deploy/devnet.json` |
 | 3.10 | ✅ `@notice/@param/@return` — gate `npm run lint:docs` |
-| Gate Fase 3 | Acta de cierre + confirmación Fase 4 |
+| Gate Fase 3 | Acta de cierre pendiente; gate técnico Anchor ✅ |
+| Gate Fase 4 | [Acta-Cierre-Fase-4.md](../../Doc/Acta-Cierre-Fase-4.md) (2026-07-26) |
 
 ### PDA `SettlementState` (3.3)
 
