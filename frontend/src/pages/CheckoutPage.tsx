@@ -12,6 +12,7 @@ import { CheckoutErrorAlert } from '../components/CheckoutErrorAlert'
 import { RailSelector } from '../components/RailSelector'
 import { TransactionViewer } from '../components/TransactionViewer'
 import { useTransactionLog } from '../hooks/useTransactionLog'
+import { appEnv, isPlaceholderApiKey } from '../config/env'
 import { parseCheckoutRequest } from '../schemas/checkout'
 import type { CheckoutResponse } from '../schemas/gateway'
 import type { CardPayload } from '../schemas/card'
@@ -175,6 +176,16 @@ export function CheckoutPage() {
             Validá la tarjeta para habilitar el pago.
           </p>
         )}
+
+        {import.meta.env.DEV &&
+        (appEnv.usingDefaults.apiBaseUrl || isPlaceholderApiKey()) ? (
+          <p className="mt-3 text-center text-xs text-slate-600">
+            Config por defecto ({appEnv.apiBaseUrl}). Copiá{' '}
+            <span className="font-mono">.env.example</span> →{' '}
+            <span className="font-mono">.env.local</span> si el Gateway usa otros
+            valores.
+          </p>
+        ) : null}
       </div>
     </main>
   )
