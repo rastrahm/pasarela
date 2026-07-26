@@ -41,8 +41,9 @@ async fn health() -> Json<HealthResponse> {
 async fn checkout(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    Json(body): Json<CheckoutRequest>,
+    body: Result<Json<CheckoutRequest>, axum::extract::rejection::JsonRejection>,
 ) -> Result<Json<CheckoutResponse>, GatewayError> {
+    let Json(body) = body.map_err(|_| GatewayError::InvalidRequest)?;
     let response = process_checkout(
         state.as_ref(),
         CheckoutInput {

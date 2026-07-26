@@ -139,6 +139,9 @@ fn funding_type_env_suffix(funding_type: FundingType) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     fn with_env(key: &str, value: &str, f: impl FnOnce()) {
         unsafe { env::set_var(key, value) };
@@ -146,14 +149,29 @@ mod tests {
         unsafe { env::remove_var(key) };
     }
 
+    fn clear_optional_gateway_env() {
+        for key in [
+            "GATEWAY_DEFAULT_FUNDING_TYPE",
+            "GATEWAY_RAIL_TRADITIONAL_BANK_ENABLED",
+            "GATEWAY_RAIL_BINANCE_CEX_ENABLED",
+            "GATEWAY_RAIL_SOLANA_WALLET_ENABLED",
+        ] {
+            unsafe { env::remove_var(key) };
+        }
+    }
+
     #[test]
     fn from_env_requires_oracle_api_key() {
+        let _guard = ENV_LOCK.lock().expect("env lock");
+        clear_optional_gateway_env();
         unsafe { env::remove_var("ORACLE_API_KEY") };
         assert!(AppConfig::from_env().is_err());
     }
 
     #[test]
     fn from_env_loads_defaults() {
+        let _guard = ENV_LOCK.lock().expect("env lock");
+        clear_optional_gateway_env();
         with_env("ORACLE_API_KEY", "test-key", || {
             let config = AppConfig::from_env().expect("config");
             assert_eq!(config.port, 8080);
@@ -166,6 +184,8 @@ mod tests {
 
     #[test]
     fn from_env_parses_merchant_default_funding_type() {
+        let _guard = ENV_LOCK.lock().expect("env lock");
+        clear_optional_gateway_env();
         with_env("ORACLE_API_KEY", "test-key", || {
             with_env("GATEWAY_DEFAULT_FUNDING_TYPE", "binance_cex", || {
                 let config = AppConfig::from_env().expect("config");
@@ -179,6 +199,8 @@ mod tests {
 
     #[test]
     fn rail_context_reflects_merchant_default() {
+        let _guard = ENV_LOCK.lock().expect("env lock");
+        clear_optional_gateway_env();
         with_env("ORACLE_API_KEY", "test-key", || {
             with_env("GATEWAY_DEFAULT_FUNDING_TYPE", "solana_wallet", || {
                 let config = AppConfig::from_env().expect("config");
@@ -193,6 +215,8 @@ mod tests {
 
     #[test]
     fn load_rail_configs_respects_enabled_flags() {
+        let _guard = ENV_LOCK.lock().expect("env lock");
+        clear_optional_gateway_env();
         with_env("ORACLE_API_KEY", "test-key", || {
             with_env("GATEWAY_RAIL_TRADITIONAL_BANK_ENABLED", "false", || {
                 let config = AppConfig::from_env().expect("config");

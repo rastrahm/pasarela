@@ -3,7 +3,7 @@
 use std::net::IpAddr;
 
 use domain::{
-    Amount, Currency, FundingType, HoldId, LiquidityError, TransactionId, TransactionStatus,
+    Amount, Currency, FundingType, HoldId, TransactionId, TransactionStatus,
 };
 use oracle_client::{
     AuthorizeRequest, CardPayload, FundingType as OracleFundingType, RequestOptions,
@@ -56,7 +56,7 @@ pub async fn process_checkout(
         .oracle_client
         .authorize(authorize_request, options.clone())
         .await
-        .map_err(map_oracle_error)?;
+        .map_err(GatewayError::from_oracle_error)?;
 
     let settlement_context = SettlementContext {
         hold_id: HoldId::new(auth.hold_id),
@@ -101,7 +101,7 @@ pub async fn process_checkout(
                 settlement_proof: None,
             });
 
-            Err(map_liquidity_error(settlement_err))
+            Err(GatewayError::from_liquidity_error(settlement_err))
         }
     }
 }
@@ -136,42 +136,6 @@ fn to_oracle_funding_type(rail: FundingType) -> OracleFundingType {
         FundingType::TraditionalBank => OracleFundingType::TraditionalBank,
         FundingType::BinanceCex => OracleFundingType::BinanceCex,
         FundingType::SolanaWallet => OracleFundingType::SolanaWallet,
-    }
-}
-
-fn map_oracle_error(error: oracle_client::OracleClientError) -> GatewayError {
-    use oracle_client::OracleClientError;
-
-    match error {
-        OracleClientError::Unauthorized | OracleClientError::Forbidden => {
-            GatewayError::Unauthorized
-        }
-        OracleClientError::InvalidCard => GatewayError::InvalidCard,
-        OracleClientError::InsufficientFunds | OracleClientError::FraudDeclined => {
-            GatewayError::InsufficientFunds
-        }
-        OracleClientError::RailUnavailable | OracleClientError::Unavailable(_) => {
-            GatewayError::RailUnavailable
-        }
-        OracleClientError::Conflict => GatewayError::Conflict("conflicto en Oracle".to_string()),
-        OracleClientError::TooManyRequests => {
-            GatewayError::Internal("rate limit Oracle".to_string())
-        }
-        OracleClientError::NotFound => GatewayError::NotFound,
-        OracleClientError::InternalError | OracleClientError::InvalidResponse(_) => {
-            GatewayError::Internal(error.to_string())
-        }
-        OracleClientError::Api(body) => GatewayError::Internal(body.message),
-    }
-}
-
-fn map_liquidity_error(error: LiquidityError) -> GatewayError {
-    match error {
-        LiquidityError::InsufficientFunds { .. } => GatewayError::InsufficientFunds,
-        LiquidityError::RailUnavailable { .. } => GatewayError::RailUnavailable,
-        LiquidityError::HoldNotFound
-        | LiquidityError::HoldFailed
-        | LiquidityError::SettlementFailed => GatewayError::Internal(error.to_string()),
     }
 }
 

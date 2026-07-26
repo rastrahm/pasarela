@@ -59,7 +59,7 @@ pub fn select_rail(
 
     switcher
         .select(&input)
-        .map_err(|_| GatewayError::RailUnavailable)
+        .map_err(GatewayError::from_rail_error)
 }
 
 /// Configuración operativa por defecto (tres rieles habilitados).
@@ -155,37 +155,6 @@ mod tests {
     }
 
     #[test]
-    fn uses_merchant_default_when_no_explicit_preference() {
-        let switcher = RailSwitcher;
-        let context = RailContext {
-            merchant_default: Some(FundingType::SolanaWallet),
-            ..RailContext::default()
-        };
-        let request = CheckoutRequest {
-            amount: 50.0,
-            currency: "USD".to_string(),
-            card: crate::routes::CheckoutCardPayload {
-                pan: "4111111111111111".to_string(),
-                expiry_month: "12".to_string(),
-                expiry_year: "2030".to_string(),
-                cvv: "123".to_string(),
-                cardholder: "Test".to_string(),
-            },
-            funding_type: None,
-        };
-        let currency = Currency::from_str("USD").expect("currency");
-        let rail = select_rail(
-            &switcher,
-            &context,
-            &request,
-            domain::Amount::from_units(50),
-            &currency,
-        )
-        .expect("rail");
-        assert_eq!(rail, FundingType::SolanaWallet);
-    }
-
-    #[test]
     fn falls_back_when_preferred_rail_lacks_funds() {
         let switcher = RailSwitcher;
         let context = RailContext::default().with_availability(vec![
@@ -227,5 +196,79 @@ mod tests {
         )
         .expect("rail");
         assert_eq!(rail, FundingType::BinanceCex);
+    }
+
+    #[test]
+    fn uses_merchant_default_when_no_explicit_preference() {
+        let switcher = RailSwitcher;
+        let context = RailContext {
+            merchant_default: Some(FundingType::SolanaWallet),
+            ..RailContext::default()
+        };
+        let request = CheckoutRequest {
+            amount: 50.0,
+            currency: "USD".to_string(),
+            card: crate::routes::CheckoutCardPayload {
+                pan: "4111111111111111".to_string(),
+                expiry_month: "12".to_string(),
+                expiry_year: "2030".to_string(),
+                cvv: "123".to_string(),
+                cardholder: "Test".to_string(),
+            },
+            funding_type: None,
+        };
+        let currency = Currency::from_str("USD").expect("currency");
+        let rail = select_rail(
+            &switcher,
+            &context,
+            &request,
+            domain::Amount::from_units(50),
+            &currency,
+        )
+        .expect("rail");
+        assert_eq!(rail, FundingType::SolanaWallet);
+    }
+
+    #[test]
+    fn maps_rail_insufficient_funds_without_fallback_to_gateway_error() {
+        let switcher = RailSwitcher;
+        let context = RailContext {
+            fallback_enabled: false,
+            availability: vec![
+                RailAvailability {
+                    rail: FundingType::TraditionalBank,
+                    operational: true,
+                    funds_sufficient: false,
+                },
+                RailAvailability {
+                    rail: FundingType::BinanceCex,
+                    operational: true,
+                    funds_sufficient: true,
+                },
+            ],
+            ..RailContext::default()
+        };
+        let request = CheckoutRequest {
+            amount: 100.0,
+            currency: "USD".to_string(),
+            card: crate::routes::CheckoutCardPayload {
+                pan: "4111111111111111".to_string(),
+                expiry_month: "12".to_string(),
+                expiry_year: "2030".to_string(),
+                cvv: "123".to_string(),
+                cardholder: "Test".to_string(),
+            },
+            funding_type: Some(FundingType::TraditionalBank),
+        };
+        let currency = Currency::from_str("USD").expect("currency");
+        let err = select_rail(
+            &switcher,
+            &context,
+            &request,
+            domain::Amount::from_units(100),
+            &currency,
+        )
+        .expect_err("error");
+        assert_eq!(err, GatewayError::InsufficientFunds);
     }
 }
