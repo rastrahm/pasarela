@@ -359,7 +359,7 @@ Validar el sistema completo, cerrar brechas de seguridad del MVP y preparar arte
 | 6.2 | Tests cross-service | Gateway + Oracle real en procesos locales | ✅ `cross_service_integration.rs` |
 | 6.3 | Checklist QA por caso de uso | UC-01 a UC-11 ([Checklist-QA-Fase-6.md](./Checklist-QA-Fase-6.md)) | ✅ Documentado |
 | 6.4 | Revisión de seguridad | OWASP, PCI simulado, frontera Oracle (§9 Arquitectura) | ✅ [Revision-Seguridad-Fase-6.md](./Revision-Seguridad-Fase-6.md) |
-| 6.5 | Revisión de rendimiento | Latencia checkout ~1–3 s; sin cuellos obvios |
+| 6.5 | Revisión de rendimiento | Latencia checkout ~1–3 s; sin cuellos obvios | ✅ [Revision-Rendimiento-Fase-6.md](./Revision-Rendimiento-Fase-6.md) |
 | 6.6 | CI pipeline | `cargo test`, `anchor test`, `pnpm test`, Playwright |
 | 6.7 | Documentar runbook de desarrollo | Cómo levantar todo el stack localmente (`cargo run`, servicios en terminal) |
 | 6.8 | Resolver deuda técnica crítica | Lista priorizada — [Deuda-Tecnica.md](./Deuda-Tecnica.md) |
@@ -604,6 +604,7 @@ Cada transición requiere **confirmación explícita** (según Contexto General)
 | [Contexto General.md](./Contexto%20General.md) | Prompt maestro y regla de confirmación |
 | `oracle/README.md` | Operación del servicio Oracle |
 | `crates/api-gateway/README.md` | Operación del Gateway, curl/Postman |
+| [Revision-Rendimiento-Fase-6.md](./Revision-Rendimiento-Fase-6.md) | Rendimiento checkout Fase 6.5 |
 | [Revision-Seguridad-Fase-6.md](./Revision-Seguridad-Fase-6.md) | Revisión OWASP/PCI Fase 6.4 |
 | [Checklist-QA-Fase-6.md](./Checklist-QA-Fase-6.md) | QA UC-01–UC-11 (Fase 6.3) |
 | [Deuda-Tecnica.md](./Deuda-Tecnica.md) | Registro de deuda P0–P3 (2026-07-26) |

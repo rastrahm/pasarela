@@ -259,7 +259,7 @@
 |-------------|---------------------------|
 | **6.1** Playwright E2E | DT-P1-01, DT-P0-03, DT-P0-04 |
 | **6.2** Cross-service | DT-P0-01, DT-P1-03, DT-P1-05 |
-| **6.3** Checklist QA | DT-P0-03 runbook facilita items ⬜ manual |
+| **6.5** Rendimiento | PERF-R-01 async Solana UX | Post-MVP |
 | **6.6** CI | DT-P0-02 |
 | **6.7** Runbook | DT-P0-03, DT-P0-04 |
 | **6.8** Deuda crítica | Revisar ítems P0 marcados como bloqueantes en esta tabla |
@@ -270,6 +270,7 @@
 
 | Fecha | Cambio |
 |-------|--------|
+| 2026-07-26 | Revisión rendimiento 6.5 — [Revision-Rendimiento-Fase-6.md](./Revision-Rendimiento-Fase-6.md) |
 | 2026-07-26 | Revisión seguridad 6.4 — [Revision-Seguridad-Fase-6.md](./Revision-Seguridad-Fase-6.md); fixes IDOR + idempotency PCI |
 | 2026-07-26 | DT-P0-01 mitigado — `cross_service_integration.rs` + `oracle/src/test_support.rs` |
 

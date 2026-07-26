@@ -1,0 +1,12 @@
+{
+  "amount": 100.0,
+  "currency": "USD",
+  "funding_type": "traditional_bank",
+  "card": {
+    "pan": "4111111111111111",
+    "expiry_month": "12",
+    "expiry_year": "2030",
+    "cvv": "123",
+    "cardholder": "Bench User"
+  }
+}
