@@ -12,8 +12,8 @@
 | **Objetivo** | Procesador de pagos con tarjeta y liquidación mutable en tres rieles (Banco, Binance CEX, Solana) |
 | **Enfoque** | Desarrollo secuencial por fases; confirmación explícita antes de avanzar |
 | **Unidades de despliegue** | `pasarela/` + `oracle/` + `antifraud/` (monorepo D5) |
-| **Fase actual** | **Fase 4 — API Gateway** *(cerrada 2026-07-26)* |
-| **Próximo hito** | **Fase 5 — Frontend** (Dashboard & Checkout) |
+| **Fase actual** | **Fase 6 — Integración, QA y hardening** |
+| **Última fase cerrada** | **Fase 5 — Frontend** *(2026-07-26 — [Acta](./Acta-Cierre-Fase-5.md))* |
 
 ### Estado actual del repositorio
 
@@ -22,8 +22,8 @@
 | Documentación de arquitectura | ✅ Completada |
 | Casos de uso, ER y flujos | ✅ Completados |
 | Esqueleto `oracle/` | ✅ Completo (67 tests, persistencia, seguridad) |
-| Workspace `pasarela/` (crates, programs, frontend) | ✅ `domain`, `rail-switcher`, `oracle-client`, `settlement-adapters`, `api-gateway`; `programs/payment-settlement/` en devnet |
-| CI/CD | ⬜ Pendiente (Rust) · ✅ `programs-anchor-test` workflow |
+| Workspace `pasarela/` (crates, programs, frontend) | ✅ Backend + `programs/payment-settlement/` devnet + **`frontend/`** checkout React |
+| CI/CD | ⬜ Pendiente (Rust) · ⬜ Pendiente (frontend) · ✅ `programs-anchor-test` workflow |
 | Despliegue producción | ⬜ Pendiente |
 
 ---
@@ -309,6 +309,8 @@ Frontend → POST /api/v1/checkout
 
 ## 9. Fase 5 — Frontend (Dashboard & Checkout)
 
+> **Estado: CERRADA** · Acta: [Acta-Cierre-Fase-5.md](./Acta-Cierre-Fase-5.md) (2026-07-26)
+
 ### Objetivo
 
 Interfaz React que demuestra mutabilidad del riel: formulario de tarjeta, selector de riel y visor de transacción.
@@ -317,25 +319,27 @@ Interfaz React que demuestra mutabilidad del riel: formulario de tarjeta, select
 
 | # | Paso | Detalle |
 |---|------|---------|
-| 5.1 | Inicializar `frontend/` con Vite + React + TS + Tailwind | `pnpm` como gestor |
-| 5.2 | Configurar Vitest + React Testing Library | TDD en componentes |
-| 5.3 | Implementar `CardForm` | Validación Zod; datos ficticios |
-| 5.4 | Implementar `RailSelector` | TraditionalBank / BinanceCex / SolanaWallet |
-| 5.5 | Implementar `TransactionViewer` | Log en tiempo real del flujo |
-| 5.6 | Implementar `CheckoutPage` | Orquesta componentes; llama al Gateway |
-| 5.7 | Schemas Zod alineados con API Gateway | Request/response tipados |
-| 5.8 | Manejo de errores UX | 402, 422, 503 con mensajes claros |
-| 5.9 | Variables de entorno | `VITE_API_BASE_URL` apuntando al Gateway |
-| 5.10 | Tests de interacción | Submit, selector de riel, errores de validación |
-| 5.11 | JSDoc en componentes y hooks | Según `react.cursorrules` |
+| 5.1 | Inicializar `frontend/` con Vite + React + TS + Tailwind | ✅ `pnpm` como gestor |
+| 5.2 | Configurar Vitest + React Testing Library | ✅ TDD en componentes |
+| 5.3 | Implementar `CardForm` | ✅ Validación Zod; datos ficticios |
+| 5.4 | Implementar `RailSelector` | ✅ TraditionalBank / BinanceCex / SolanaWallet |
+| 5.5 | Implementar `TransactionViewer` | ✅ Log en tiempo real del flujo |
+| 5.6 | Implementar `CheckoutPage` | ✅ Orquesta componentes; llama al Gateway |
+| 5.7 | Schemas Zod alineados con API Gateway | ✅ Request/response tipados |
+| 5.8 | Manejo de errores UX | ✅ 402, 422, 503 con mensajes claros |
+| 5.9 | Variables de entorno | ✅ `VITE_API_BASE_URL` apuntando al Gateway |
+| 5.10 | Tests de interacción | ✅ Submit, selector de riel, errores de validación |
+| 5.11 | JSDoc en componentes y hooks | ✅ Según `react.cursorrules` |
 
 ### Criterios de aceptación (gate)
 
-- [ ] Checkout manual funcional en navegador
-- [ ] Cambio de riel reflejado en respuesta (proof distinto)
-- [ ] `pnpm test` verde
-- [ ] Frontend **no** llama al Oracle directamente
-- [ ] Confirmación explícita para Fase 6
+- [x] Checkout manual funcional en navegador
+- [x] Cambio de riel reflejado en respuesta (proof distinto)
+- [x] `pnpm test` verde (77 tests)
+- [x] Frontend **no** llama al Oracle directamente
+- [x] Confirmación explícita para Fase 6
+
+> Acta de cierre: [Acta-Cierre-Fase-5.md](./Acta-Cierre-Fase-5.md) (2026-07-26)
 
 ---
 
@@ -598,7 +602,9 @@ Cada transición requiere **confirmación explícita** (según Contexto General)
 | [Contexto General.md](./Contexto%20General.md) | Prompt maestro y regla de confirmación |
 | `oracle/README.md` | Operación del servicio Oracle |
 | `crates/api-gateway/README.md` | Operación del Gateway, curl/Postman |
+| [Acta-Cierre-Fase-5.md](./Acta-Cierre-Fase-5.md) | Gate Fase 5 (2026-07-26) |
 | [Acta-Cierre-Fase-4.md](./Acta-Cierre-Fase-4.md) | Gate Fase 4 (2026-07-26) |
+| `frontend/README.md` | Operación del checkout React |
 | `rust.cursorrules` / `solana.cursorrules` / `react.cursorrules` / `qa.cursorrules` | Estándares de código |
 
 ---
@@ -606,5 +612,5 @@ Cada transición requiere **confirmación explícita** (según Contexto General)
 ## 17. Próxima acción inmediata
 
 1. ~~**Cerrar Fase 0**~~ ✅ Ver [Acta-Cierre-Fase-0.md](./Acta-Cierre-Fase-0.md).
-2. ~~**Fases 1–4**~~ ✅ Dominio, Oracle, Solana, Gateway — ver actas de cierre.
-3. **Iniciar Fase 5**: crear `frontend/` con Vite + React + TypeScript + Tailwind; conectar checkout al Gateway (`VITE_API_BASE_URL`).
+2. ~~**Fases 1–5**~~ ✅ Dominio, Oracle, Solana, Gateway, Frontend — ver actas de cierre.
+3. **Iniciar Fase 6**: Playwright E2E, tests cross-service Gateway + Oracle real, checklist QA UC-01–UC-11.
