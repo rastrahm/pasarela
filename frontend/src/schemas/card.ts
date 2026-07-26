@@ -143,7 +143,11 @@ export const cardPayloadSchema = z
 export type CardFormValues = z.input<typeof cardPayloadSchema>
 export type ValidatedCardPayload = z.output<typeof cardPayloadSchema>
 
-/** Valida datos de tarjeta; devuelve errores por campo para el formulario. */
+/** Valida datos de tarjeta; devuelve errores por campo para el formulario.
+ *
+ * @param values - Valores crudos del formulario.
+ * @returns Discriminated union: `{ success: true, data }` o `{ success: false, errors }`.
+ */
 export function validateCardPayload(
   values: CardFormValues,
 ): { success: true; data: ValidatedCardPayload } | { success: false; errors: Partial<Record<keyof CardPayload, string>> } {

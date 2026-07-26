@@ -26,7 +26,12 @@ const DEFAULT_AMOUNT = 100
 const DEFAULT_CURRENCY = 'USD'
 
 /**
- * Página de checkout: orquesta tarjeta, riel y visor; invoca solo al Gateway.
+ * Página principal de checkout (UC-01 / UC-10).
+ *
+ * Orquesta {@link CardForm}, {@link RailSelector} y {@link TransactionViewer};
+ * invoca únicamente `POST /api/v1/checkout` del Gateway (nunca al Oracle).
+ *
+ * @returns Layout completo del flujo de pago multi-rail.
  */
 export function CheckoutPage() {
   const [amount, setAmount] = useState(String(DEFAULT_AMOUNT))

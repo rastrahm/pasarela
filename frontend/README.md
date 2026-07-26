@@ -1,54 +1,70 @@
-# React + TypeScript + Vite
+# frontend — Pasarela Multi-Rail Checkout
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Interfaz React del checkout multi-rail — **Fase 5 ✅** (acta: [Doc/Acta-Cierre-Fase-5.md](../Doc/Acta-Cierre-Fase-5.md)).
 
-Currently, two official plugins are available:
+> El frontend **solo** comunica con el **API Gateway**. Nunca invoca al Oracle directamente.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Requisitos
 
-## Expanding the ESLint configuration
+- Node.js 18+ (20+ recomendado para tooling futuro)
+- pnpm 9+
+- API Gateway en marcha (`cargo run -p api-gateway`)
+- Oracle en marcha para checkout real (`cargo run` en `oracle/`)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Configuración
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+```bash
+cd frontend
+cp .env.example .env.local
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+| Variable | Descripción |
+|----------|-------------|
+| `VITE_API_BASE_URL` | URL del Gateway (default `http://127.0.0.1:8080`) |
+| `VITE_GATEWAY_API_KEY` | Debe coincidir con `GATEWAY_TEST_API_KEY` en `crates/api-gateway/.env` |
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Desarrollo
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
+```bash
+pnpm install
+pnpm dev          # http://localhost:5173
 ```
+
+## Checkout manual
+
+1. Arrancar Oracle y Gateway (ver READMEs respectivos).
+2. Abrir `http://localhost:5173`.
+3. Clic en **Usar datos de prueba** → **Validar tarjeta**.
+4. Elegir riel (Banco / Binance / Solana).
+5. **Confirmar pago**.
+6. Verificar log en **Transacción** y comprobante (`ACH-*`, `CEX-*`, `SOL-*`).
+
+## Tests
+
+```bash
+pnpm test         # watch mode
+pnpm test:run     # CI — 77 tests
+pnpm lint
+pnpm build
+```
+
+## Estructura
+
+```
+src/
+├── api/              # Cliente Gateway (checkout, transacciones, health)
+├── components/       # CardForm, RailSelector, TransactionViewer, CheckoutErrorAlert
+├── config/           # Variables VITE_* (env.ts)
+├── hooks/            # useTransactionLog
+├── pages/            # CheckoutPage
+├── schemas/          # Zod — contrato Gateway + validación tarjeta
+└── test/             # Helpers RTL (checkout-flow.ts)
+```
+
+## Endpoints consumidos
+
+| Método | Ruta | Uso |
+|--------|------|-----|
+| `POST` | `/api/v1/checkout` | Checkout (principal) |
+| `GET` | `/api/v1/transactions/{id}` | Cliente listo; UI pendiente |
+| `GET` | `/health` | Healthcheck Gateway |

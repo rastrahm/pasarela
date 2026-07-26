@@ -1,5 +1,8 @@
 import type { CheckoutErrorUx } from '../api/errors'
 
+/**
+ * Props de {@link CheckoutErrorAlert}.
+ */
 export interface CheckoutErrorAlertProps {
   /** Error estructurado a mostrar; `null` oculta el componente. */
   error: CheckoutErrorUx | null
@@ -17,7 +20,10 @@ const KIND_STYLES: Record<CheckoutErrorUx['kind'], string> = {
 }
 
 /**
- * Alerta accesible con título, mensaje e hint según el tipo de error del Gateway.
+ * Alerta accesible de errores de checkout (402, 422, 503 y red).
+ *
+ * @param props - {@link CheckoutErrorAlertProps}
+ * @returns Banner `role="alert"` con título, mensaje, hint y código HTTP, o `null`.
  */
 export function CheckoutErrorAlert({ error }: CheckoutErrorAlertProps) {
   if (!error) {

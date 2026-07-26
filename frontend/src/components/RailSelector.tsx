@@ -1,18 +1,23 @@
 import type { FundingType } from '../schemas/funding'
 import { RAIL_OPTIONS } from '../schemas/funding'
 
+/**
+ * Props de {@link RailSelector}.
+ */
 export interface RailSelectorProps {
-  /** Riel seleccionado actualmente. */
+  /** Riel seleccionado actualmente (`FundingType` en snake_case). */
   value: FundingType
-  /** Invocado al cambiar de riel. */
+  /** Invocado al cambiar de riel; recibe el nuevo `FundingType`. */
   onChange: (rail: FundingType) => void
   /** Deshabilita la selección durante un checkout en curso. */
   disabled?: boolean
 }
 
 /**
- * Selector de riel de liquidación (TraditionalBank, BinanceCex, SolanaWallet).
- * Emite valores `snake_case` listos para `POST /api/v1/checkout`.
+ * Selector de riel de liquidación — TraditionalBank, BinanceCex, SolanaWallet (UC-02).
+ *
+ * @param props - {@link RailSelectorProps}
+ * @returns Fieldset accesible con radiogroup por riel.
  */
 export function RailSelector({
   value,

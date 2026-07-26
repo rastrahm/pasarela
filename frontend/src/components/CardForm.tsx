@@ -9,6 +9,9 @@ import {
 
 export type CardFormField = keyof CardPayload
 
+/**
+ * Props de {@link CardForm}.
+ */
 export interface CardFormProps {
   /** Invocado con datos validados listos para el checkout. */
   onSubmit: (card: CardPayload) => void
@@ -33,8 +36,10 @@ const FIELD_LABELS: Record<CardFormField, string> = {
 }
 
 /**
- * Formulario de tarjeta ficticia con validación Zod local.
- * No persiste PAN/CVV; solo entrega el payload al padre tras validar.
+ * Formulario de tarjeta ficticia con validación Zod local (UC-01).
+ *
+ * @param props - {@link CardFormProps}
+ * @returns Formulario accesible con campos PAN, vencimiento, CVV y titular.
  */
 export function CardForm({ onSubmit, disabled = false }: CardFormProps) {
   const [values, setValues] = useState<CardFormValues>(EMPTY_VALUES)

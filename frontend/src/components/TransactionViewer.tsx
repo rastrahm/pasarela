@@ -6,12 +6,15 @@ import {
   type TransactionLogEntry,
 } from '../schemas/transaction'
 
+/**
+ * Props de {@link TransactionViewer}.
+ */
 export interface TransactionViewerProps {
   /** Entradas del log en orden cronológico. */
   entries: TransactionLogEntry[]
-  /** Resultado final del checkout, si ya está disponible. */
+  /** Resultado final del checkout (`CheckoutResponse`), si ya está disponible. */
   result?: CheckoutResponse | null
-  /** Mensaje cuando aún no hay entradas. */
+  /** Mensaje cuando aún no hay entradas en el log. */
   emptyMessage?: string
 }
 
@@ -22,6 +25,7 @@ const LEVEL_STYLES: Record<TransactionLogEntry['level'], string> = {
   error: 'border-rose-800/70 text-rose-200',
 }
 
+/** Formatea timestamp del log para la UI (locale es-AR). */
 function formatTime(date: Date): string {
   return date.toLocaleTimeString('es-AR', {
     hour: '2-digit',
@@ -31,7 +35,10 @@ function formatTime(date: Date): string {
 }
 
 /**
- * Visor de log en tiempo real del checkout: validación, hold, riel y comprobante.
+ * Visor de log en tiempo real del checkout — validación, hold, riel y comprobante (UC-10).
+ *
+ * @param props - {@link TransactionViewerProps}
+ * @returns Sección con lista `aria-live` y panel de comprobante opcional.
  */
 export function TransactionViewer({
   entries,

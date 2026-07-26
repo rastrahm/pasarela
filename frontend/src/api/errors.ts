@@ -21,7 +21,7 @@ export interface CheckoutErrorUx {
   hint?: string
 }
 
-/** Error de red o HTTP al invocar el Gateway. */
+/** Error de red o HTTP al invocar el Gateway; incluye UX en `.ux`. */
 export class GatewayApiError extends Error {
   readonly status: number
   readonly errorCode?: string
@@ -62,6 +62,10 @@ const RAIL_UNAVAILABLE_UX: Omit<CheckoutErrorUx, 'status' | 'errorCode' | 'messa
 
 /**
  * Mapea respuesta HTTP del Gateway a copy UX (402, 422, 503 prioritarios).
+ *
+ * @param status - Código HTTP del Gateway.
+ * @param body - Cuerpo JSON de error opcional (`ErrorResponse`).
+ * @returns Objeto {@link CheckoutErrorUx} listo para {@link CheckoutErrorAlert}.
  */
 export function mapGatewayErrorToUx(
   status: number,
@@ -142,7 +146,13 @@ export function mapGatewayErrorToUx(
   }
 }
 
-/** Mensaje plano — compatibilidad con código previo. */
+/**
+ * Mensaje plano derivado de {@link mapGatewayErrorToUx} (compatibilidad).
+ *
+ * @param status - Código HTTP.
+ * @param body - Cuerpo de error opcional.
+ * @returns Texto del mensaje principal para mostrar al usuario.
+ */
 export function resolveGatewayErrorMessage(
   status: number,
   body?: Partial<GatewayErrorResponse>,
@@ -150,7 +160,13 @@ export function resolveGatewayErrorMessage(
   return mapGatewayErrorToUx(status, body).message
 }
 
-/** Errores de validación local antes de llamar al Gateway. */
+/**
+ * Errores de validación local antes de llamar al Gateway.
+ *
+ * @param message - Detalle del error de formulario.
+ * @param hint - Acción sugerida opcional.
+ * @returns {@link CheckoutErrorUx} con kind `invalid_request`.
+ */
 export function mapLocalCheckoutError(message: string, hint?: string): CheckoutErrorUx {
   return {
     kind: 'invalid_request',
@@ -160,7 +176,12 @@ export function mapLocalCheckoutError(message: string, hint?: string): CheckoutE
   }
 }
 
-/** Errores de red o fallos inesperados del fetch. */
+/**
+ * Errores de red o fallos inesperados del `fetch`.
+ *
+ * @param error - Excepción capturada en checkout.
+ * @returns {@link CheckoutErrorUx} con kind `network` o `unknown`.
+ */
 export function mapNetworkErrorToUx(error: unknown): CheckoutErrorUx {
   if (error instanceof TypeError) {
     return {
@@ -186,7 +207,13 @@ export function mapNetworkErrorToUx(error: unknown): CheckoutErrorUx {
   }
 }
 
-/** Construye GatewayApiError a partir de la respuesta HTTP. */
+/**
+ * Construye {@link GatewayApiError} a partir de la respuesta HTTP.
+ *
+ * @param status - Código HTTP.
+ * @param body - Cuerpo de error parseado opcionalmente.
+ * @returns Excepción con {@link CheckoutErrorUx} en `.ux`.
+ */
 export function createGatewayApiError(
   status: number,
   body?: Partial<GatewayErrorResponse>,

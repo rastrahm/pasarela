@@ -1,16 +1,28 @@
+/**
+ * Helpers de interacción RTL para flujos de checkout en tests (paso 5.10).
+ */
 import { screen } from '@testing-library/react'
 import type { UserEvent } from '@testing-library/user-event'
 import { vi } from 'vitest'
 
 import type { FundingType } from '../schemas/funding'
 
-/** Rellena y valida la tarjeta demo en el checkout. */
+/**
+ * Rellena y valida la tarjeta demo en CheckoutPage.
+ *
+ * @param user - Instancia de `userEvent.setup()`.
+ */
 export async function validateDemoCard(user: UserEvent): Promise<void> {
   await user.click(screen.getByRole('button', { name: /usar datos de prueba/i }))
   await user.click(screen.getByRole('button', { name: /validar tarjeta/i }))
 }
 
-/** Selecciona un riel de liquidación por etiqueta accesible. */
+/**
+ * Selecciona un riel de liquidación por etiqueta accesible del radiogroup.
+ *
+ * @param user - Instancia de `userEvent.setup()`.
+ * @param railLabel - Regex del label visible del riel.
+ */
 export async function selectFundingRail(
   user: UserEvent,
   railLabel: RegExp,
@@ -24,7 +36,12 @@ const RAIL_LABELS: Record<FundingType, RegExp> = {
   solana_wallet: /solana wallet/i,
 }
 
-/** Selecciona riel por valor snake_case. */
+/**
+ * Selecciona riel por valor `FundingType` (snake_case).
+ *
+ * @param user - Instancia de `userEvent.setup()`.
+ * @param fundingType - Riel a seleccionar.
+ */
 export async function selectFundingType(
   user: UserEvent,
   fundingType: FundingType,
@@ -32,12 +49,21 @@ export async function selectFundingType(
   await selectFundingRail(user, RAIL_LABELS[fundingType])
 }
 
-/** Confirma el pago en CheckoutPage. */
+/**
+ * Pulsa «Confirmar pago» en CheckoutPage.
+ *
+ * @param user - Instancia de `userEvent.setup()`.
+ */
 export async function submitCheckoutPayment(user: UserEvent): Promise<void> {
   await user.click(screen.getByRole('button', { name: /confirmar pago/i }))
 }
 
-/** Flujo completo hasta submit. */
+/**
+ * Flujo de interacción: validar tarjeta demo → elegir riel → confirmar pago.
+ *
+ * @param user - Instancia de `userEvent.setup()`.
+ * @param fundingType - Riel enviado en el checkout.
+ */
 export async function checkoutWithRail(
   user: UserEvent,
   fundingType: FundingType,
@@ -47,21 +73,35 @@ export async function checkoutWithRail(
   await submitCheckoutPayment(user)
 }
 
-/** Devuelve el body JSON del último fetch mockeado. */
+/**
+ * Devuelve el body JSON del último `fetch` mockeado en el test.
+ *
+ * @returns Objeto parseado del cuerpo POST.
+ */
 export function getLastFetchJsonBody(): Record<string, unknown> {
   const calls = vi.mocked(fetch).mock.calls
   const init = calls[calls.length - 1]?.[1]
   return JSON.parse(String(init?.body)) as Record<string, unknown>
 }
 
-/** Devuelve headers del último fetch mockeado. */
+/**
+ * Devuelve los headers del último `fetch` mockeado en el test.
+ *
+ * @returns Mapa de headers HTTP enviados.
+ */
 export function getLastFetchHeaders(): Record<string, string> {
   const calls = vi.mocked(fetch).mock.calls
   const init = calls[calls.length - 1]?.[1]
   return (init?.headers ?? {}) as Record<string, string>
 }
 
-/** Mock de checkout exitoso por riel (proof distinto por riel — gate Fase 5). */
+/**
+ * Construye respuesta mock de checkout settled para un riel dado.
+ *
+ * @param fundingType - Riel usado en la respuesta.
+ * @param proof - Comprobante de liquidación (ACH, CEX, SOL, etc.).
+ * @returns Objeto compatible con {@link CheckoutResponse}.
+ */
 export function mockSettledCheckoutResponse(
   fundingType: FundingType,
   proof: string,
