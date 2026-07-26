@@ -147,6 +147,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
+name = "api-gateway"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "domain",
+ "dotenvy",
+ "http-body-util",
+ "oracle-client",
+ "rail-switcher",
+ "serde",
+ "serde_json",
+ "settlement-adapters",
+ "thiserror 1.0.69",
+ "tokio",
+ "tower",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "ark-bn254"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
