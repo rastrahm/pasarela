@@ -55,14 +55,13 @@ test.describe('Checkout E2E — stack real', () => {
       await openCheckout(page)
       await checkoutWithRail(page, fundingType)
 
-      await expect(page.getByText('Comprobante')).toBeVisible()
-      await expect(page.getByText('Liquidada', { exact: true })).toBeVisible()
-      await expect(page.getByText(railLabel)).toBeVisible()
-      await expect(
-        page.getByText(settlementProofLabel(fundingType)),
-      ).toBeVisible()
+      const receipt = page.getByText('Comprobante', { exact: true }).locator('..')
+      await expect(receipt).toBeVisible()
+      await expect(receipt.getByText('Liquidada', { exact: true })).toBeVisible()
+      await expect(receipt.getByText(railLabel)).toBeVisible()
+      await expect(receipt.getByText(settlementProofLabel(fundingType))).toBeVisible()
 
-      const proofValue = page.locator('dd.break-all.font-mono').first()
+      const proofValue = receipt.locator('dd.break-all.font-mono').first()
       await expect(proofValue).not.toBeEmpty()
     })
   }
