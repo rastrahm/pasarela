@@ -67,13 +67,23 @@ cargo test -p api-gateway
 
 # Solo gate E2E Fase 4 (paso 4.14)
 cargo test -p api-gateway --test e2e_integration
+
+# Cross-service Fase 6.2 (Oracle real + PostgreSQL)
+export ORACLE_DATABASE_URL=postgres://postgres:<password>@localhost:5432/oracle_test
+cargo test -p api-gateway --test cross_service_integration -- --test-threads=1
+
+# Rendimiento Fase 6.5 (mock Oracle + stub settlement)
+cargo test -p api-gateway --test performance_integration
 ```
 
 Estructura de tests de integración:
 
 | Archivo | Alcance |
 |---------|---------|
-| `e2e_integration.rs` | Gate Fase 4 — flujo completo |
+| `e2e_integration.rs` | Gate Fase 4 — flujo completo (mock Oracle) |
+| `cross_service_integration.rs` | Fase 6.2 — Gateway + Oracle real (PostgreSQL) |
+| `performance_integration.rs` | Fase 6.5 — latencia checkout stub p99 ≤ 500 ms |
+| `security_integration.rs` | Fase 6.4 — IDOR, PCI idempotency |
 | `checkout_integration.rs` | Checkout + auth |
 | `rail_oracle_integration.rs` | Rail Switcher + Oracle |
 | `hold_release_integration.rs` | Liberación de hold UC-04 |

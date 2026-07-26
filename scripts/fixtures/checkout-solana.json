@@ -1,13 +1,12 @@
 {
-  "gateway_request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "amount": 100.0,
+  "currency": "USD",
+  "funding_type": "solana_wallet",
   "card": {
     "pan": "4111111111111111",
     "expiry_month": "12",
     "expiry_year": "2030",
     "cvv": "123",
     "cardholder": "Demo User"
-  },
-  "amount": 100.0,
-  "currency": "USD",
-  "funding_type": "traditional_bank"
+  }
 }

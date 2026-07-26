@@ -7,18 +7,17 @@ use tower::ServiceExt;
 
 use api_gateway::services::IDEMPOTENCY_KEY_HEADER;
 
+use super::fixtures::{checkout_no_rail as fixture_checkout_no_rail, checkout_payload as fixture_checkout_payload};
 use super::{bearer_header, TEST_API_KEY};
 
-/// Payload JSON de checkout con riel explícito.
+/// Payload JSON de checkout con riel explícito (fixture canónico).
 pub fn checkout_payload(funding_type: &str) -> String {
-    format!(
-        r#"{{"amount":100.0,"currency":"USD","funding_type":"{funding_type}","card":{{"pan":"4111111111111111","expiry_month":"12","expiry_year":"2030","cvv":"123","cardholder":"Test User"}}}}"#
-    )
+    fixture_checkout_payload(funding_type)
 }
 
 /// Payload JSON de checkout sin preferencia de riel.
 pub fn checkout_payload_no_rail() -> String {
-    r#"{"amount":100.0,"currency":"USD","card":{"pan":"4111111111111111","expiry_month":"12","expiry_year":"2030","cvv":"123","cardholder":"Test User"}}"#.to_string()
+    fixture_checkout_no_rail()
 }
 
 /// Ejecuta `POST /api/v1/checkout` y devuelve status + JSON.

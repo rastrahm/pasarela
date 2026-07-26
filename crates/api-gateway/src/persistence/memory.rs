@@ -48,12 +48,19 @@ impl InMemoryStore {
         Ok(())
     }
 
-    pub fn get_transaction(&self, id: Uuid) -> Result<Option<TransactionRecord>, PersistenceError> {
+    pub fn get_transaction(
+        &self,
+        id: Uuid,
+        merchant_id: MerchantId,
+    ) -> Result<Option<TransactionRecord>, PersistenceError> {
         let map = self
             .transactions
             .read()
             .map_err(|_| PersistenceError::LockPoisoned)?;
-        Ok(map.get(&id).cloned())
+        Ok(map
+            .get(&id)
+            .filter(|record| record.merchant_id == merchant_id)
+            .cloned())
     }
 
     pub fn insert_settlement(&self, record: &SettlementRecord) -> Result<(), PersistenceError> {

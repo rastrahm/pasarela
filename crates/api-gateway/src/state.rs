@@ -150,7 +150,11 @@ impl AppState {
     }
 
     /// Consulta una transacción almacenada (UC-09).
-    pub async fn get_transaction(&self, id: Uuid) -> Result<Option<TransactionRecord>, PersistenceError> {
-        self.store.get_transaction(id).await
+    pub async fn get_transaction(
+        &self,
+        id: Uuid,
+        merchant_id: domain::MerchantId,
+    ) -> Result<Option<TransactionRecord>, PersistenceError> {
+        self.store.get_transaction(id, merchant_id).await
     }
 }

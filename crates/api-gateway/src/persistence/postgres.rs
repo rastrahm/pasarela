@@ -60,6 +60,7 @@ impl PostgresStore {
     pub async fn get_transaction(
         &self,
         id: Uuid,
+        merchant_id: MerchantId,
     ) -> Result<Option<TransactionRecord>, PersistenceError> {
         let row = sqlx::query_as::<_, TransactionRow>(
             r#"
@@ -73,10 +74,11 @@ impl PostgresStore {
                 settlement_proof,
                 oracle_hold_id
             FROM gateway_transaction
-            WHERE id = $1
+            WHERE id = $1 AND merchant_id = $2
             "#,
         )
         .bind(id)
+        .bind(merchant_id.0)
         .fetch_optional(&self.pool)
         .await?;
 

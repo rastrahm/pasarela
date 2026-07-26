@@ -23,7 +23,7 @@
 | Casos de uso, ER y flujos | ✅ Completados |
 | Esqueleto `oracle/` | ✅ Completo (67 tests, persistencia, seguridad) |
 | Workspace `pasarela/` (crates, programs, frontend) | ✅ Backend + `programs/payment-settlement/` devnet + **`frontend/`** checkout React |
-| CI/CD | ⬜ Pendiente (Rust) · ⬜ Pendiente (frontend) · ✅ `programs-anchor-test` workflow |
+| CI/CD | ✅ `ci.yml` (Rust + frontend + Playwright) · ✅ `programs-anchor-test.yml` |
 | Despliegue producción | ⬜ Pendiente |
 
 ---
@@ -345,6 +345,8 @@ Interfaz React que demuestra mutabilidad del riel: formulario de tarjeta, select
 
 ## 10. Fase 6 — Integración, QA y hardening
 
+> **Estado: EN CURSO** · Inicio: 2026-07-26 · Deuda: [Deuda-Tecnica.md](./Deuda-Tecnica.md)
+
 ### Objetivo
 
 Validar el sistema completo, cerrar brechas de seguridad del MVP y preparar artefactos de despliegue.
@@ -353,14 +355,14 @@ Validar el sistema completo, cerrar brechas de seguridad del MVP y preparar arte
 
 | # | Paso | Detalle |
 |---|------|---------|
-| 6.1 | Tests E2E con Playwright | Flujo checkout completo por cada riel |
-| 6.2 | Tests cross-service | Gateway + Oracle real en procesos locales |
-| 6.3 | Checklist QA por caso de uso | UC-01 a UC-11 ([Casos-de-Uso](./Casos-de-Uso-ER-Flujos.md)) |
-| 6.4 | Revisión de seguridad | OWASP, PCI simulado, frontera Oracle (§9 Arquitectura) |
-| 6.5 | Revisión de rendimiento | Latencia checkout ~1–3 s; sin cuellos obvios |
-| 6.6 | CI pipeline | `cargo test`, `anchor test`, `pnpm test`, Playwright |
-| 6.7 | Documentar runbook de desarrollo | Cómo levantar todo el stack localmente (`cargo run`, servicios en terminal) |
-| 6.8 | Resolver deuda técnica crítica | Lista priorizada antes de staging |
+| 6.1 | Tests E2E con Playwright | Flujo checkout completo por cada riel | 🔄 UI en CI; stack real manual |
+| 6.2 | Tests cross-service | Gateway + Oracle real en procesos locales | ✅ `cross_service_integration.rs` |
+| 6.3 | Checklist QA por caso de uso | UC-01 a UC-11 ([Checklist-QA-Fase-6.md](./Checklist-QA-Fase-6.md)) | ✅ Documentado |
+| 6.4 | Revisión de seguridad | OWASP, PCI simulado, frontera Oracle (§9 Arquitectura) | ✅ [Revision-Seguridad-Fase-6.md](./Revision-Seguridad-Fase-6.md) |
+| 6.5 | Revisión de rendimiento | Latencia checkout ~1–3 s; sin cuellos obvios | ✅ [Revision-Rendimiento-Fase-6.md](./Revision-Rendimiento-Fase-6.md) |
+| 6.6 | CI pipeline | `cargo test`, `anchor test`, `pnpm test`, Playwright | ✅ [`ci.yml`](../.github/workflows/ci.yml) + [`Doc/CI.md`](./CI.md) |
+| 6.7 | Documentar runbook de desarrollo | Cómo levantar todo el stack localmente (`cargo run`, servicios en terminal) | ✅ [Runbook-Desarrollo.md](./Runbook-Desarrollo.md) + [`scripts/check-env.sh`](../scripts/check-env.sh) |
+| 6.8 | Resolver deuda técnica crítica | Lista priorizada — [Deuda-Tecnica.md](./Deuda-Tecnica.md) | ✅ [Cierre-Deuda-Fase-6.8.md](./Cierre-Deuda-Fase-6.8.md) |
 
 ### Checklist QA mínimo (extracto)
 
@@ -377,8 +379,8 @@ Validar el sistema completo, cerrar brechas de seguridad del MVP y preparar arte
 
 - [ ] Playwright E2E verde en los 3 rieles
 - [ ] Stack local levantable según runbook (sin contenedores)
-- [ ] CI verde en rama principal
-- [ ] Checklist QA firmado / aprobado
+- [ ] CI verde en rama principal — ver [`Doc/CI.md`](./CI.md) y [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)
+- [ ] Checklist QA firmado / aprobado — ver [Checklist-QA-Fase-6.md §16](./Checklist-QA-Fase-6.md#16-aprobación-gate-fase-6)
 - [ ] Confirmación explícita para Fase 7
 
 ---
@@ -602,6 +604,13 @@ Cada transición requiere **confirmación explícita** (según Contexto General)
 | [Contexto General.md](./Contexto%20General.md) | Prompt maestro y regla de confirmación |
 | `oracle/README.md` | Operación del servicio Oracle |
 | `crates/api-gateway/README.md` | Operación del Gateway, curl/Postman |
+| [Doc/CI.md](./CI.md) | Pipelines GitHub Actions (Fase 6.6) |
+| [Runbook-Desarrollo.md](./Runbook-Desarrollo.md) | Stack local sin contenedores (Fase 6.7) |
+| [Revision-Rendimiento-Fase-6.md](./Revision-Rendimiento-Fase-6.md) | Rendimiento checkout Fase 6.5 |
+| [Revision-Seguridad-Fase-6.md](./Revision-Seguridad-Fase-6.md) | Revisión OWASP/PCI Fase 6.4 |
+| [Checklist-QA-Fase-6.md](./Checklist-QA-Fase-6.md) | QA UC-01–UC-11 (Fase 6.3) |
+| [Deuda-Tecnica.md](./Deuda-Tecnica.md) | Registro de deuda P0–P3 (2026-07-26) |
+| [Cierre-Deuda-Fase-6.8.md](./Cierre-Deuda-Fase-6.8.md) | Cierre deuda crítica Fase 6.8 |
 | [Acta-Cierre-Fase-5.md](./Acta-Cierre-Fase-5.md) | Gate Fase 5 (2026-07-26) |
 | [Acta-Cierre-Fase-4.md](./Acta-Cierre-Fase-4.md) | Gate Fase 4 (2026-07-26) |
 | `frontend/README.md` | Operación del checkout React |
@@ -613,4 +622,4 @@ Cada transición requiere **confirmación explícita** (según Contexto General)
 
 1. ~~**Cerrar Fase 0**~~ ✅ Ver [Acta-Cierre-Fase-0.md](./Acta-Cierre-Fase-0.md).
 2. ~~**Fases 1–5**~~ ✅ Dominio, Oracle, Solana, Gateway, Frontend — ver actas de cierre.
-3. **Iniciar Fase 6**: Playwright E2E, tests cross-service Gateway + Oracle real, checklist QA UC-01–UC-11.
+3. **Fase 6 — gate final**: pasos 6.1–6.8 completados; pendiente E2E 3 rieles, QA firmado, CI en GitHub, confirmación Fase 7.

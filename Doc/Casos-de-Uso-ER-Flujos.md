@@ -1079,5 +1079,7 @@ Ver detalle: [Arquitectura §12](./Arquitectura.md#12-decisiones-de-diseño--res
 - [Plan-de-Implementacion.md](./Plan-de-Implementacion.md) — Hoja de ruta hasta producción
 - [Acta-Cierre-Fase-0.md](./Acta-Cierre-Fase-0.md) — Gate Fase 0 cerrado (2026-07-25)
 - [Acta-Cierre-Fase-5.md](./Acta-Cierre-Fase-5.md) — Gate Fase 5 cerrado (2026-07-26)
+- [Revision-Seguridad-Fase-6.md](./Revision-Seguridad-Fase-6.md) — Revisión OWASP/PCI (Fase 6.4)
+- [Checklist-QA-Fase-6.md](./Checklist-QA-Fase-6.md) — QA UC-01–UC-11 (Fase 6.3)
 - [Acta-Cierre-Fase-4.md](./Acta-Cierre-Fase-4.md) — Gate Fase 4 cerrado (2026-07-26)
 - [Contexto General.md](./Contexto%20General.md) — Prompt maestro del proyecto

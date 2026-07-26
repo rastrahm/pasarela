@@ -70,7 +70,7 @@ async fn get_transaction(
     headers: HeaderMap,
     Path(id): Path<Uuid>,
 ) -> Result<Json<TransactionResponse>, GatewayError> {
-    let _merchant = authenticate_merchant(&headers, state.merchant_registry.as_ref())?;
-    let response = lookup_transaction(state.as_ref(), id).await?;
+    let merchant = authenticate_merchant(&headers, state.merchant_registry.as_ref())?;
+    let response = lookup_transaction(state.as_ref(), merchant.merchant_id, id).await?;
     Ok(Json(response))
 }

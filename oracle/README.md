@@ -107,7 +107,10 @@ cargo test --lib
 
 # Integración (requiere PostgreSQL en ORACLE_DATABASE_URL)
 export ORACLE_DATABASE_URL=postgres://postgres:<password>@localhost:5432/oracle_test
-cargo test -- --test-threads=1
+cargo test -p oracle-authorization --test gateway_contract -- --test-threads=1
+
+# Cross-service desde el Gateway (Fase 6.2)
+cargo test -p api-gateway --test cross_service_integration -- --test-threads=1
 ```
 
 Usar `--test-threads=1` evita deadlocks en la BD compartida entre tests de integración.

@@ -31,6 +31,8 @@ pub fn build_app(state: AppState) -> Router {
     routes::create_router(Arc::new(state)).layer(http_trace_layer())
 }
 
+pub mod test_support;
+
 /// Conecta a PostgreSQL y ejecuta migraciones pendientes.
 pub async fn init_database(database_url: &str) -> anyhow::Result<sqlx::PgPool> {
     let pool = sqlx::PgPool::connect(database_url).await?;

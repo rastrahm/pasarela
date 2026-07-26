@@ -135,7 +135,7 @@ Usuario → CardForm (Zod local)
 |------|-------------------|---------------|---------|
 | Entorno jsdom | Común en stack React | `happy-dom@15` por incompatibilidad jsdom 29 + Node 18 | Ninguno — RTL funcional |
 | Node.js | LTS 20+ recomendado | Desarrollo con Node 18.20.8; `create-vite@6` | Bajo — documentado en paso 5.1 |
-| E2E Playwright | Plan Fase 6 | No incluido en Fase 5 | Ninguno — gate Fase 6 |
+| **6.1** Playwright E2E | Plan Fase 6 | Suite en `tests/e2e/`; job CI `e2e` | Gate parcial — stack real manual |
 | Dashboard admin | Nombre fase incluye "Dashboard" | MVP = checkout únicamente | Bajo — dashboard post-MVP |
 | Consulta transacción UI | UC-09 | Cliente `fetchTransaction` listo; sin pantalla dedicada | Bajo — Fase 6 opcional |
 
