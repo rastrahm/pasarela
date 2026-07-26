@@ -147,7 +147,7 @@ pasarela/
 │   └── settlement-adapters/      # Implementaciones concretas de cada riel
 ├── programs/
 │   └── payment-settlement/       # Programa Anchor (Fase 3)
-├── frontend/                     # React + Tailwind (Fase 5)
+├── frontend/                     # React + Tailwind ✅ (Fase 5 — cerrada 2026-07-26)
 ├── tests/
 │   ├── integration/              # Tests cross-crate (Gateway ↔ mocks del Oracle)
 │   └── e2e/                      # Playwright
@@ -445,15 +445,18 @@ pub struct PaymentProcessed {
 
 ---
 
-## 8. Capa de Presentación (Fase 5)
+## 8. Capa de Presentación (Fase 5) ✅ — cerrada 2026-07-26
+
+> Acta: [Acta-Cierre-Fase-5.md](./Acta-Cierre-Fase-5.md) · Operación: [frontend/README.md](../frontend/README.md)
 
 ### 8.1 Componentes
 
 | Componente | Responsabilidad |
 |------------|-----------------|
 | `CardForm` | Entrada de datos ficticios de tarjeta; validación con Zod |
-| `RailSelector` | Dropdown/switch para elegir riel de liquidación |
+| `RailSelector` | Radiogroup para elegir riel de liquidación |
 | `TransactionViewer` | Log en tiempo real: riel usado, status, Tx Signature o ref. bancaria |
+| `CheckoutErrorAlert` | Errores UX del Gateway (402, 422, 503, red) |
 | `CheckoutPage` | Orquesta el flujo completo; llama `POST /api/v1/checkout` |
 
 ### 8.2 Flujo de datos en el frontend
@@ -472,8 +475,25 @@ Usuario ingresa tarjeta + selecciona riel
 - **TypeScript** estricto
 - **Tailwind CSS**
 - **Zod** para validación
-- **Vitest + React Testing Library** para tests
+- **Vitest + React Testing Library** para tests (77 tests)
 - **pnpm** como gestor de paquetes
+
+### 8.4 Cliente API (solo Gateway)
+
+| Módulo | Endpoints |
+|--------|-----------|
+| `frontend/src/api/gateway.ts` | `POST /api/v1/checkout`, `GET /api/v1/transactions/{id}`, `GET /health` |
+
+Headers en checkout: `Authorization: Bearer sk_*`, `Idempotency-Key` (UUID).
+
+### 8.5 Variables de entorno
+
+| Variable | Descripción |
+|----------|-------------|
+| `VITE_API_BASE_URL` | URL del Gateway (default `http://127.0.0.1:8080`) |
+| `VITE_GATEWAY_API_KEY` | API key comercio — alineada con `GATEWAY_TEST_API_KEY` |
+
+Plantilla: `frontend/.env.example` → `.env.local`.
 
 ---
 
@@ -853,6 +873,7 @@ Estas se resolverán al abordar producción real:
 - [Contexto General.md](./Contexto%20General.md) — Prompt maestro y fases del proyecto
 - [Plan-de-Implementacion.md](./Plan-de-Implementacion.md) — Hoja de ruta hasta producción
 - [Acta-Cierre-Fase-0.md](./Acta-Cierre-Fase-0.md) — Gate Fase 0 (2026-07-25)
+- [Acta-Cierre-Fase-5.md](./Acta-Cierre-Fase-5.md) — Gate Fase 5 (2026-07-26)
 - [Acta-Cierre-Fase-4.md](./Acta-Cierre-Fase-4.md) — Gate Fase 4 (2026-07-26)
 - [Casos-de-Uso-ER-Flujos.md](./Casos-de-Uso-ER-Flujos.md) — UC, ER y flujos operativos
 - `rust.cursorrules` — Directivas de desarrollo Rust
