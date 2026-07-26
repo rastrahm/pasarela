@@ -48,6 +48,8 @@ pnpm lint
 pnpm build
 ```
 
+E2E Playwright (Fase 6): ver [tests/e2e/README.md](../tests/e2e/README.md).
+
 ## Estructura
 
 ```

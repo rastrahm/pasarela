@@ -31,8 +31,11 @@ uuid = { version = "1", features = ["v4", "serde"] }
 [dev-dependencies]
 async-trait = "0.1"
 http-body-util = "0.1"
+oracle-authorization = { path = "../../oracle" }
 oracle-client = { path = "../oracle-client" }
 rail-switcher = { path = "../rail-switcher" }
+serial_test = "3"
 settlement-adapters = { path = "../settlement-adapters" }
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres"] }
 tower = { version = "0.5", features = ["util"] }
 uuid = { version = "1", features = ["v4"] }

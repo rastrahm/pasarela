@@ -23,6 +23,51 @@ pub use http::{
 };
 pub use mock_oracle::{spawn_mock_oracle, MockOracleOpts, OracleCapture};
 
+/// API key alineada con `oracle_authorization::test_support::TEST_ORACLE_API_KEY`.
+pub const REAL_ORACLE_API_KEY: &str = oracle_authorization::test_support::TEST_ORACLE_API_KEY;
+
+/// Configuración del Gateway apuntando a un Oracle real en tests cross-service.
+pub fn cross_service_app_config(oracle_base_url: String, merchant_id: MerchantId) -> Arc<AppConfig> {
+    Arc::new(AppConfig {
+        host: "127.0.0.1".to_string(),
+        port: 8080,
+        oracle_base_url,
+        oracle_api_key: REAL_ORACLE_API_KEY.to_string(),
+        oracle_timeout_secs: 5,
+        oracle_health_check: false,
+        default_merchant_id: merchant_id,
+        merchant_api_keys: vec![],
+        bootstrap_test_api_key: None,
+        merchant_default_funding_type: None,
+        rail_fallback_enabled: true,
+        rail_configs: api_gateway::services::rails::default_rail_configs(),
+        database_url: None,
+    })
+}
+
+/// App Axum con Oracle HTTP real (proceso local) y adaptadores stub de liquidación.
+pub fn build_cross_service_app(oracle_base_url: String) -> axum::Router {
+    let merchant_id = test_merchant_id();
+    let config = cross_service_app_config(oracle_base_url.clone(), merchant_id);
+    let oracle_client = Arc::new(
+        HttpOracleClient::new(
+            config.oracle_base_url.clone(),
+            config.oracle_api_key.clone(),
+            config.oracle_timeout_secs,
+        )
+        .expect("cliente oracle real"),
+    );
+
+    build_app(AppState::from_parts(
+        config,
+        oracle_client,
+        SettlementEngine::with_stub_adapters(),
+        RailSwitcher,
+        RailContext::default(),
+        test_merchant_registry(merchant_id),
+    ))
+}
+
 /// API key de comercio válida para tests (`sk_test_` + 8+ chars).
 pub const TEST_API_KEY: &str = "sk_test_validkey1";
 

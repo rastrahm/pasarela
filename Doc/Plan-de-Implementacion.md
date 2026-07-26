@@ -345,6 +345,8 @@ Interfaz React que demuestra mutabilidad del riel: formulario de tarjeta, select
 
 ## 10. Fase 6 — Integración, QA y hardening
 
+> **Estado: EN CURSO** · Inicio: 2026-07-26 · Deuda: [Deuda-Tecnica.md](./Deuda-Tecnica.md)
+
 ### Objetivo
 
 Validar el sistema completo, cerrar brechas de seguridad del MVP y preparar artefactos de despliegue.
@@ -353,14 +355,14 @@ Validar el sistema completo, cerrar brechas de seguridad del MVP y preparar arte
 
 | # | Paso | Detalle |
 |---|------|---------|
-| 6.1 | Tests E2E con Playwright | Flujo checkout completo por cada riel |
-| 6.2 | Tests cross-service | Gateway + Oracle real en procesos locales |
+| 6.1 | Tests E2E con Playwright | Flujo checkout completo por cada riel | 🔄 En curso |
+| 6.2 | Tests cross-service | Gateway + Oracle real en procesos locales | ✅ `cross_service_integration.rs` |
 | 6.3 | Checklist QA por caso de uso | UC-01 a UC-11 ([Casos-de-Uso](./Casos-de-Uso-ER-Flujos.md)) |
 | 6.4 | Revisión de seguridad | OWASP, PCI simulado, frontera Oracle (§9 Arquitectura) |
 | 6.5 | Revisión de rendimiento | Latencia checkout ~1–3 s; sin cuellos obvios |
 | 6.6 | CI pipeline | `cargo test`, `anchor test`, `pnpm test`, Playwright |
 | 6.7 | Documentar runbook de desarrollo | Cómo levantar todo el stack localmente (`cargo run`, servicios en terminal) |
-| 6.8 | Resolver deuda técnica crítica | Lista priorizada antes de staging |
+| 6.8 | Resolver deuda técnica crítica | Lista priorizada — [Deuda-Tecnica.md](./Deuda-Tecnica.md) |
 
 ### Checklist QA mínimo (extracto)
 
@@ -602,6 +604,7 @@ Cada transición requiere **confirmación explícita** (según Contexto General)
 | [Contexto General.md](./Contexto%20General.md) | Prompt maestro y regla de confirmación |
 | `oracle/README.md` | Operación del servicio Oracle |
 | `crates/api-gateway/README.md` | Operación del Gateway, curl/Postman |
+| [Deuda-Tecnica.md](./Deuda-Tecnica.md) | Registro de deuda P0–P3 (2026-07-26) |
 | [Acta-Cierre-Fase-5.md](./Acta-Cierre-Fase-5.md) | Gate Fase 5 (2026-07-26) |
 | [Acta-Cierre-Fase-4.md](./Acta-Cierre-Fase-4.md) | Gate Fase 4 (2026-07-26) |
 | `frontend/README.md` | Operación del checkout React |
@@ -613,4 +616,4 @@ Cada transición requiere **confirmación explícita** (según Contexto General)
 
 1. ~~**Cerrar Fase 0**~~ ✅ Ver [Acta-Cierre-Fase-0.md](./Acta-Cierre-Fase-0.md).
 2. ~~**Fases 1–5**~~ ✅ Dominio, Oracle, Solana, Gateway, Frontend — ver actas de cierre.
-3. **Iniciar Fase 6**: Playwright E2E, tests cross-service Gateway + Oracle real, checklist QA UC-01–UC-11.
+3. **Fase 6 en curso**: paso 6.1 Playwright E2E; ver [Deuda-Tecnica.md](./Deuda-Tecnica.md) para ítems priorizados por QA.
