@@ -13,7 +13,7 @@ use tokio::net::TcpListener;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-use api_gateway::{build_app, config::AppConfig, state::AppState};
+use api_gateway::{build_app, config::AppConfig, services::IDEMPOTENCY_KEY_HEADER, state::AppState};
 
 async fn spawn_mock_oracle() -> String {
     let hold_id = Uuid::new_v4();
@@ -85,6 +85,7 @@ async fn checkout_returns_settled_with_mock_oracle() {
                 .uri("/api/v1/checkout")
                 .header("content-type", "application/json")
                 .header("x-forwarded-for", "127.0.0.1")
+                .header(IDEMPOTENCY_KEY_HEADER, "checkout-int-001")
                 .body(Body::from(
                     r#"{"amount":100.0,"currency":"USD","funding_type":"traditional_bank","card":{"pan":"4111111111111111","expiry_month":"12","expiry_year":"2030","cvv":"123","cardholder":"Test User"}}"#,
                 ))
@@ -124,6 +125,7 @@ async fn get_transaction_returns_checkout_result() {
                 .uri("/api/v1/checkout")
                 .header("content-type", "application/json")
                 .header("x-forwarded-for", "127.0.0.1")
+                .header(IDEMPOTENCY_KEY_HEADER, "checkout-int-001")
                 .body(Body::from(
                     r#"{"amount":100.0,"currency":"USD","funding_type":"traditional_bank","card":{"pan":"4111111111111111","expiry_month":"12","expiry_year":"2030","cvv":"123","cardholder":"Test User"}}"#,
                 ))
@@ -184,6 +186,7 @@ async fn checkout_rejects_invalid_amount() {
                 .method("POST")
                 .uri("/api/v1/checkout")
                 .header("content-type", "application/json")
+                .header(IDEMPOTENCY_KEY_HEADER, "checkout-int-invalid-amount")
                 .body(Body::from(
                     r#"{"amount":0,"currency":"USD","card":{"pan":"4111111111111111","expiry_month":"12","expiry_year":"2030","cvv":"123","cardholder":"Test User"}}"#,
                 ))

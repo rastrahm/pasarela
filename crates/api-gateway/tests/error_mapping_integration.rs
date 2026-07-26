@@ -21,7 +21,7 @@ use api_gateway::{
     build_app,
     config::AppConfig,
     error::codes,
-    services::{rails::default_rail_configs, RailContext},
+    services::{rails::default_rail_configs, RailContext, IDEMPOTENCY_KEY_HEADER},
     state::AppState,
 };
 
@@ -123,6 +123,7 @@ async fn checkout(app: axum::Router, body: &str) -> (StatusCode, serde_json::Val
                 .uri("/api/v1/checkout")
                 .header("content-type", "application/json")
                 .header("x-forwarded-for", "127.0.0.1")
+                .header(IDEMPOTENCY_KEY_HEADER, "error-map-test-key")
                 .body(Body::from(body.to_string()))
                 .expect("request"),
         )

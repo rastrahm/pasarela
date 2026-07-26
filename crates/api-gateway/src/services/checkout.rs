@@ -17,6 +17,7 @@ use crate::services::rails::{select_rail, settlement_rail_id};
 use crate::state::{AppState, TransactionRecord};
 
 /// Parámetros de una solicitud de checkout entrante.
+#[derive(Clone)]
 pub struct CheckoutInput {
     pub request: CheckoutRequest,
     pub caller_ip: Option<String>,

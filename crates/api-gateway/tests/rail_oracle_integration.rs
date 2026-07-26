@@ -22,7 +22,7 @@ use uuid::Uuid;
 use api_gateway::{
     build_app,
     config::AppConfig,
-    services::{rails::default_rail_configs, RailContext},
+    services::{rails::default_rail_configs, RailContext, IDEMPOTENCY_KEY_HEADER},
     state::AppState,
 };
 use rail_switcher::RailSwitcher;
@@ -151,6 +151,7 @@ async fn checkout_json(app: axum::Router, body: String) -> (StatusCode, serde_js
                 .uri("/api/v1/checkout")
                 .header("content-type", "application/json")
                 .header("x-forwarded-for", "127.0.0.1")
+                .header(IDEMPOTENCY_KEY_HEADER, "rail-oracle-test-key")
                 .body(Body::from(body))
                 .expect("request"),
         )

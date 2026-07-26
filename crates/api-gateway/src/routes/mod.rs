@@ -13,7 +13,10 @@ use axum::{
 use uuid::Uuid;
 
 use crate::error::GatewayError;
-use crate::services::{extract_caller_ip, lookup_transaction, process_checkout, CheckoutInput};
+use crate::services::{
+    extract_caller_ip, extract_idempotency_key, lookup_transaction, process_checkout_idempotent,
+    CheckoutInput,
+};
 use crate::state::AppState;
 
 pub use dto::{
@@ -44,8 +47,10 @@ async fn checkout(
     body: Result<Json<CheckoutRequest>, axum::extract::rejection::JsonRejection>,
 ) -> Result<Json<CheckoutResponse>, GatewayError> {
     let Json(body) = body.map_err(|_| GatewayError::InvalidRequest)?;
-    let response = process_checkout(
+    let idempotency_key = extract_idempotency_key(&headers)?;
+    let response = process_checkout_idempotent(
         state.as_ref(),
+        idempotency_key,
         CheckoutInput {
             request: body,
             caller_ip: extract_caller_ip(&headers),

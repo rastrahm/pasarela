@@ -9,7 +9,7 @@ API Gateway y orquestador de checkout — **Fase 4, paso 4.5**.
 | Método | Ruta | Auth | Estado |
 |--------|------|------|--------|
 | `GET` | `/health` | — | ✅ |
-| `POST` | `/api/v1/checkout` | API key (4.11) + Idempotency-Key (4.10) | ✅ 4.6–4.7 |
+| `POST` | `/api/v1/checkout` | API key (4.11) + `Idempotency-Key` (4.10) | ✅ 4.6–4.10 |
 | `GET` | `/api/v1/transactions/{id}` | API key comercio | ✅ 4.8 |
 | Errores HTTP §6.2 | checkout + consultas | — | ✅ 4.9 |
 

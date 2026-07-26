@@ -10,6 +10,7 @@ use settlement_adapters::SettlementEngine;
 use uuid::Uuid;
 
 use crate::config::AppConfig;
+use crate::services::idempotency::IdempotencyStore;
 use crate::services::rails::RailContext;
 
 /// Registro en memoria de una transacción (persistencia real en paso 4.12).
@@ -30,6 +31,7 @@ pub struct AppState {
     pub rail_context: RailContext,
     pub default_merchant_id: MerchantId,
     transactions: Arc<RwLock<HashMap<Uuid, TransactionRecord>>>,
+    idempotency: Arc<IdempotencyStore>,
 }
 
 impl AppState {
@@ -73,7 +75,13 @@ impl AppState {
             rail_switcher,
             rail_context,
             transactions: Arc::new(RwLock::new(HashMap::new())),
+            idempotency: Arc::new(IdempotencyStore::default()),
         }
+    }
+
+    /// Store de idempotencia in-memory (paso 4.10).
+    pub fn idempotency_store(&self) -> &IdempotencyStore {
+        &self.idempotency
     }
 
     /// Persiste el resultado de checkout en memoria.

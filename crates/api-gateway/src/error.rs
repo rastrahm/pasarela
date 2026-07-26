@@ -30,7 +30,7 @@ pub struct ErrorResponse {
 }
 
 /// Errores de la capa HTTP del Gateway.
-#[derive(Debug, Error, PartialEq, Eq)]
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum GatewayError {
     #[error("no autorizado")]
     Unauthorized,
@@ -43,6 +43,9 @@ pub enum GatewayError {
 
     #[error("solicitud inválida")]
     InvalidRequest,
+
+    #[error("Idempotency-Key requerido")]
+    MissingIdempotencyKey,
 
     #[error("conflicto: {0}")]
     Conflict(String),
@@ -66,7 +69,9 @@ impl GatewayError {
         match self {
             Self::Unauthorized => StatusCode::UNAUTHORIZED,
             Self::InsufficientFunds => StatusCode::PAYMENT_REQUIRED,
-            Self::InvalidCard | Self::InvalidRequest => StatusCode::UNPROCESSABLE_ENTITY,
+            Self::InvalidCard | Self::InvalidRequest | Self::MissingIdempotencyKey => {
+                StatusCode::UNPROCESSABLE_ENTITY
+            }
             Self::Conflict(_) => StatusCode::CONFLICT,
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::RailUnavailable => StatusCode::SERVICE_UNAVAILABLE,
@@ -81,7 +86,7 @@ impl GatewayError {
             Self::Unauthorized => codes::UNAUTHORIZED,
             Self::InsufficientFunds => codes::INSUFFICIENT_FUNDS,
             Self::InvalidCard => codes::INVALID_CARD,
-            Self::InvalidRequest => codes::INVALID_REQUEST,
+            Self::InvalidRequest | Self::MissingIdempotencyKey => codes::INVALID_REQUEST,
             Self::Conflict(_) => codes::CONFLICT,
             Self::NotFound => codes::NOT_FOUND,
             Self::RailUnavailable => codes::RAIL_UNAVAILABLE,
