@@ -362,7 +362,7 @@ Validar el sistema completo, cerrar brechas de seguridad del MVP y preparar arte
 | 6.5 | Revisión de rendimiento | Latencia checkout ~1–3 s; sin cuellos obvios | ✅ [Revision-Rendimiento-Fase-6.md](./Revision-Rendimiento-Fase-6.md) |
 | 6.6 | CI pipeline | `cargo test`, `anchor test`, `pnpm test`, Playwright | ✅ [`ci.yml`](../.github/workflows/ci.yml) + [`Doc/CI.md`](./CI.md) |
 | 6.7 | Documentar runbook de desarrollo | Cómo levantar todo el stack localmente (`cargo run`, servicios en terminal) | ✅ [Runbook-Desarrollo.md](./Runbook-Desarrollo.md) + [`scripts/check-env.sh`](../scripts/check-env.sh) |
-| 6.8 | Resolver deuda técnica crítica | Lista priorizada — [Deuda-Tecnica.md](./Deuda-Tecnica.md) |
+| 6.8 | Resolver deuda técnica crítica | Lista priorizada — [Deuda-Tecnica.md](./Deuda-Tecnica.md) | ✅ [Cierre-Deuda-Fase-6.8.md](./Cierre-Deuda-Fase-6.8.md) |
 
 ### Checklist QA mínimo (extracto)
 
@@ -610,6 +610,7 @@ Cada transición requiere **confirmación explícita** (según Contexto General)
 | [Revision-Seguridad-Fase-6.md](./Revision-Seguridad-Fase-6.md) | Revisión OWASP/PCI Fase 6.4 |
 | [Checklist-QA-Fase-6.md](./Checklist-QA-Fase-6.md) | QA UC-01–UC-11 (Fase 6.3) |
 | [Deuda-Tecnica.md](./Deuda-Tecnica.md) | Registro de deuda P0–P3 (2026-07-26) |
+| [Cierre-Deuda-Fase-6.8.md](./Cierre-Deuda-Fase-6.8.md) | Cierre deuda crítica Fase 6.8 |
 | [Acta-Cierre-Fase-5.md](./Acta-Cierre-Fase-5.md) | Gate Fase 5 (2026-07-26) |
 | [Acta-Cierre-Fase-4.md](./Acta-Cierre-Fase-4.md) | Gate Fase 4 (2026-07-26) |
 | `frontend/README.md` | Operación del checkout React |
@@ -621,4 +622,4 @@ Cada transición requiere **confirmación explícita** (según Contexto General)
 
 1. ~~**Cerrar Fase 0**~~ ✅ Ver [Acta-Cierre-Fase-0.md](./Acta-Cierre-Fase-0.md).
 2. ~~**Fases 1–5**~~ ✅ Dominio, Oracle, Solana, Gateway, Frontend — ver actas de cierre.
-3. **Fase 6 en curso**: runbook en [Runbook-Desarrollo.md](./Runbook-Desarrollo.md); pendiente gate final (6.8, E2E 3 rieles, QA firmado).
+3. **Fase 6 — gate final**: pasos 6.1–6.8 completados; pendiente E2E 3 rieles, QA firmado, CI en GitHub, confirmación Fase 7.

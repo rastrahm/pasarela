@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -17,6 +19,19 @@ import {
 } from './gateway'
 
 describe('gateway schemas', () => {
+  it('valida fixture canónico scripts/fixtures/checkout-bank.json (DT-P1-01)', () => {
+    const fixturePath = resolve(
+      __dirname,
+      '../../../scripts/fixtures/checkout-bank.json',
+    )
+    const raw = JSON.parse(readFileSync(fixturePath, 'utf8'))
+    const request = parseCheckoutRequest(raw)
+
+    expect(request.funding_type).toBe('traditional_bank')
+    expect(toCheckoutRequestBody(request).card.expiry_year).toBe('2030')
+    expect(checkoutRequestSchema.safeParse(request).success).toBe(true)
+  })
+
   it('valida CheckoutRequest con fixture E2E del Gateway', () => {
     const request = parseCheckoutRequest(GATEWAY_CHECKOUT_FIXTURE)
 

@@ -12,7 +12,7 @@
 
 | Prioridad | Cantidad | Criterio de resolución |
 |-----------|----------|------------------------|
-| **P0** | 4 | Bloquea gate Fase 6 o E2E estable |
+| **P0** | 0 bloqueantes | Resueltos o mitigados — ver [Cierre-Deuda-Fase-6.8.md](./Cierre-Deuda-Fase-6.8.md) |
 | **P1** | 6 | Fragilidad de contrato / mantenibilidad alta |
 | **P2** | 6 | Limpieza; no bloquea MVP |
 | **P3** | 5 | Post-MVP o decisión arquitectónica intencional |
@@ -27,8 +27,8 @@
 
 | Campo | Valor |
 |-------|-------|
-| **Estado** | **Mitigado** (2026-07-26) |
-| **Evidencia** | `crates/api-gateway/tests/cross_service_integration.rs` — 7 tests con `spawn_oracle_server()` de `oracle/src/test_support.rs` |
+| **Estado** | **Resuelto** (2026-07-26) |
+| **Evidencia** | `crates/api-gateway/tests/cross_service_integration.rs` — 7 tests; CI job `rust` con Postgres 16 |
 | **Requisito** | PostgreSQL en `ORACLE_DATABASE_URL` (default `postgres://postgres:postgres@localhost:5432/oracle_test`) |
 | **Ejecución** | `cargo test -p api-gateway --test cross_service_integration -- --test-threads=1` |
 | **Nota** | Sin PostgreSQL los tests se omiten con mensaje `SKIP` (no fallan) |
@@ -68,10 +68,10 @@
 
 | Campo | Valor |
 |-------|-------|
-| **Estado** | Pendiente |
-| **Archivos** | `crates/oracle-client/tests/fixtures/` (`expiry_year: "30"`), `crates/api-gateway/tests/common/http.rs` (`"2030"`), `frontend/src/schemas/gateway.ts` |
-| **Impacto** | Falsos negativos en E2E y cross-service |
-| **Acción** | Directorio canónico `crates/oracle-client/tests/fixtures/` referenciado por Gateway y frontend |
+| **Estado** | **Resuelto** (2026-07-26) |
+| **Evidencia** | `scripts/fixtures/` + `contract_fixtures.rs` + test Zod en `gateway.test.ts` |
+| **Convención** | `expiry_year: "2030"` (4 dígitos) en API pública |
+| **Doc** | [scripts/fixtures/README.md](../scripts/fixtures/README.md) |
 
 ### DT-P1-02 — Schemas frontend espejo manual del Gateway
 
@@ -87,10 +87,10 @@
 
 | Campo | Valor |
 |-------|-------|
-| **Estado** | Pendiente |
-| **Archivos** | `tests/common/mock_oracle.rs` (canónico) + inline en `rail_oracle_integration.rs`, `error_mapping_integration.rs`, `hold_release_integration.rs`, `checkout_integration.rs`, `idempotency_integration.rs` |
-| **Impacto** | Mantenimiento costoso al evolucionar contrato Oracle |
-| **Acción** | Consolidar en `tests/common/mock_oracle.rs` con opciones configurables |
+| **Estado** | **Parcial** (2026-07-26) |
+| **Consolidado** | `checkout_integration.rs`, `idempotency_integration.rs` → `tests/common/mock_oracle.rs` |
+| **Pendiente** | `rail_oracle_integration.rs`, `error_mapping_integration.rs`, `hold_release_integration.rs` |
+| **Acción post-gate** | Extender `MockOracleOpts` para errores HTTP custom |
 
 ### DT-P1-04 — `checkout.rs` monolítico (505 líneas)
 
@@ -261,7 +261,7 @@
 | **6.5** Rendimiento | PERF-R-01 async Solana UX | Post-MVP |
 | **6.6** CI | DT-P0-02 |
 | **6.7** Runbook | DT-P0-03, DT-P0-04 |
-| **6.8** Deuda crítica | Revisar ítems P0 marcados como bloqueantes en esta tabla |
+| **6.8** Deuda crítica | DT-P1-01, DT-P1-03 (parcial) — [Cierre-Deuda-Fase-6.8.md](./Cierre-Deuda-Fase-6.8.md) |
 
 ---
 
@@ -269,6 +269,8 @@
 
 | Fecha | Cambio |
 |-------|--------|
+| 2026-07-26 | Fase 6.8 — [Cierre-Deuda-Fase-6.8.md](./Cierre-Deuda-Fase-6.8.md); fixtures canónicos; mocks consolidados |
+| 2026-07-26 | Runbook 6.7 — [Runbook-Desarrollo.md](./Runbook-Desarrollo.md) + `scripts/check-env.sh` |
 | 2026-07-26 | CI unificado 6.6 — `.github/workflows/ci.yml` + [Doc/CI.md](./CI.md) |
 | 2026-07-26 | Revisión seguridad 6.4 — [Revision-Seguridad-Fase-6.md](./Revision-Seguridad-Fase-6.md); fixes IDOR + idempotency PCI |
 | 2026-07-26 | DT-P0-01 mitigado — `cross_service_integration.rs` + `oracle/src/test_support.rs` |

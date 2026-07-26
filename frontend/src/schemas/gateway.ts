@@ -102,7 +102,7 @@ export const GATEWAY_CHECKOUT_FIXTURE = {
     expiry_month: '12',
     expiry_year: '2030',
     cvv: '123',
-    cardholder: 'Test User',
+    cardholder: 'Demo User',
   },
 } as const satisfies CheckoutRequestInput
 

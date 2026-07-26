@@ -2,6 +2,7 @@
 
 #![allow(dead_code)]
 
+mod fixtures;
 mod http;
 mod mock_oracle;
 
@@ -17,6 +18,10 @@ use api_gateway::config::AppConfig;
 use api_gateway::services::{MerchantRegistry, RailContext};
 use api_gateway::{build_app, state::AppState};
 
+pub use fixtures::{
+    checkout_amount_200, checkout_bank, checkout_binance, checkout_invalid_amount,
+    checkout_no_rail, checkout_solana, load_fixture,
+};
 pub use http::{
     checkout_payload, checkout_payload_no_rail, get_health, get_transaction,
     post_checkout, post_checkout_unauthenticated, post_checkout_without_idempotency,
