@@ -27,7 +27,7 @@ pub enum PaymentError {
 }
 
 /// Error al evaluar o mover fondos en un riel.
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum LiquidityError {
     #[error("fondos insuficientes en riel {rail:?}")]
     InsufficientFunds { rail: FundingType },

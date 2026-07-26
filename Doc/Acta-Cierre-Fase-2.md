@@ -146,4 +146,5 @@ cd antifraud && cargo test
 - [Plan-de-Implementacion.md §6](./Plan-de-Implementacion.md#6-fase-2--oracle-de-autorización-servicio-independiente)
 - [API-v1.md](../oracle/docs/API-v1.md)
 - [Acta-Cierre-Fase-1.md](./Acta-Cierre-Fase-1.md)
+- [Acta-Cierre-Fase-4.md](./Acta-Cierre-Fase-4.md) — Gate Fase 4 (2026-07-26)
 - [Acta-Cierre-Fase-0.md](./Acta-Cierre-Fase-0.md)
