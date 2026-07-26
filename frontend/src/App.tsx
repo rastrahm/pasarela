@@ -10,8 +10,8 @@ function App() {
         </p>
         <h1 className="mt-2 text-3xl font-semibold text-white">Checkout</h1>
         <p className="mt-3 text-slate-400">
-          Frontend inicializado con Vite, React, TypeScript y Tailwind. Próximo paso:
-          Vitest y React Testing Library.
+          Vitest y React Testing Library listos. Próximo paso: componentes de checkout
+          (CardForm, RailSelector, TransactionViewer).
         </p>
       </div>
     </main>
