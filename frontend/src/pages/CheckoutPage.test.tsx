@@ -62,7 +62,57 @@ describe('CheckoutPage', () => {
     await user.click(screen.getByRole('button', { name: /validar tarjeta/i }))
     await user.click(screen.getByRole('button', { name: /confirmar pago/i }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/riel no disponible/i)
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/riel no disponible/i)
+    expect(alert).toHaveTextContent(/otro riel/i)
+    expect(alert).toHaveTextContent(/HTTP 503/)
+  })
+
+  it('muestra error UX ante respuesta 402', async () => {
+    const user = userEvent.setup()
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error_code: 'INSUFFICIENT_FUNDS',
+          message: 'fondos insuficientes',
+        }),
+        { status: 402 },
+      ),
+    )
+
+    renderUi(<CheckoutPage />)
+
+    await user.click(screen.getByRole('button', { name: /usar datos de prueba/i }))
+    await user.click(screen.getByRole('button', { name: /validar tarjeta/i }))
+    await user.click(screen.getByRole('button', { name: /confirmar pago/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/fondos insuficientes/i)
+    expect(alert).toHaveTextContent(/HTTP 402/)
+  })
+
+  it('muestra error UX ante respuesta 422 INVALID_CARD', async () => {
+    const user = userEvent.setup()
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error_code: 'INVALID_CARD',
+          message: 'tarjeta inválida',
+        }),
+        { status: 422 },
+      ),
+    )
+
+    renderUi(<CheckoutPage />)
+
+    await user.click(screen.getByRole('button', { name: /usar datos de prueba/i }))
+    await user.click(screen.getByRole('button', { name: /validar tarjeta/i }))
+    await user.click(screen.getByRole('button', { name: /confirmar pago/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/tarjeta inválida/i)
+    expect(alert).toHaveTextContent(/datos de prueba/i)
+    expect(alert).toHaveTextContent(/HTTP 422/)
   })
 
   it('renderiza CardForm, RailSelector y TransactionViewer', () => {

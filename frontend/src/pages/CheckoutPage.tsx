@@ -1,8 +1,14 @@
 import { useCallback, useState } from 'react'
 
+import {
+  GatewayApiError,
+  mapLocalCheckoutError,
+  mapNetworkErrorToUx,
+  type CheckoutErrorUx,
+} from '../api/errors'
 import { submitCheckout } from '../api/gateway'
-import { GatewayApiError } from '../api/errors'
 import { CardForm } from '../components/CardForm'
+import { CheckoutErrorAlert } from '../components/CheckoutErrorAlert'
 import { RailSelector } from '../components/RailSelector'
 import { TransactionViewer } from '../components/TransactionViewer'
 import { useTransactionLog } from '../hooks/useTransactionLog'
@@ -27,19 +33,29 @@ export function CheckoutPage() {
   const [card, setCard] = useState<CardPayload | null>(null)
   const [fundingType, setFundingType] = useState<FundingType>(DEFAULT_FUNDING_TYPE)
   const [checkoutResult, setCheckoutResult] = useState<CheckoutResponse | null>(null)
-  const [checkoutError, setCheckoutError] = useState<string | null>(null)
+  const [checkoutError, setCheckoutError] = useState<CheckoutErrorUx | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { entries, append, clear } = useTransactionLog()
 
   const handleCheckout = useCallback(async () => {
     if (!card) {
-      setCheckoutError('Validá la tarjeta antes de confirmar el pago.')
+      setCheckoutError(
+        mapLocalCheckoutError(
+          'Validá la tarjeta antes de confirmar el pago.',
+          'Completá el formulario y presioná «Validar tarjeta».',
+        ),
+      )
       return
     }
 
     const parsedAmount = Number.parseFloat(amount)
     if (Number.isNaN(parsedAmount) || parsedAmount <= 0) {
-      setCheckoutError('Ingresá un monto válido mayor a 0.')
+      setCheckoutError(
+        mapLocalCheckoutError(
+          'Ingresá un monto válido mayor a 0.',
+          'El monto debe ser un número positivo en USD.',
+        ),
+      )
       return
     }
 
@@ -53,7 +69,9 @@ export function CheckoutPage() {
       })
     } catch (error) {
       setCheckoutError(
-        error instanceof Error ? error.message : 'Datos de checkout inválidos.',
+        mapLocalCheckoutError(
+          error instanceof Error ? error.message : 'Datos de checkout inválidos.',
+        ),
       )
       return
     }
@@ -80,16 +98,14 @@ export function CheckoutPage() {
 
       setCheckoutResult(result)
     } catch (error) {
-      const message =
+      const ux =
         error instanceof GatewayApiError
-          ? error.message
-          : error instanceof Error
-            ? error.message
-            : TRANSACTION_LOG_MESSAGES.failed
+          ? error.ux
+          : mapNetworkErrorToUx(error)
 
-      append(message, 'error')
+      append(ux.message, 'error')
       append(TRANSACTION_LOG_MESSAGES.failed, 'error')
-      setCheckoutError(message)
+      setCheckoutError(ux)
     } finally {
       setIsSubmitting(false)
     }
@@ -103,14 +119,7 @@ export function CheckoutPage() {
         </p>
         <h1 className="mt-2 text-3xl font-semibold text-white">Checkout</h1>
 
-        {checkoutError ? (
-          <p
-            className="mt-4 rounded-lg border border-rose-800/70 bg-rose-950/40 px-3 py-2 text-sm text-rose-200"
-            role="alert"
-          >
-            {checkoutError}
-          </p>
-        ) : null}
+        <CheckoutErrorAlert error={checkoutError} />
 
         <div className="mt-6 space-y-8">
           <section className="space-y-3">

@@ -7,12 +7,10 @@ import {
   toCheckoutRequestBody,
   type CheckoutRequest,
   type CheckoutResponse,
+  type GatewayErrorResponse,
   type TransactionResponse,
 } from '../schemas/gateway'
-import {
-  GatewayApiError,
-  resolveGatewayErrorMessage,
-} from './errors'
+import { createGatewayApiError } from './errors'
 
 export interface GatewayClientOptions {
   baseUrl?: string
@@ -33,8 +31,8 @@ function resolveClientOptions(options: GatewayClientOptions = {}) {
   }
 }
 
-async function parseErrorResponse(response: Response): Promise<GatewayApiError> {
-  let body: ReturnType<typeof parseGatewayErrorResponse> | undefined
+async function parseErrorResponse(response: Response): Promise<never> {
+  let body: Partial<GatewayErrorResponse> | undefined
   try {
     const json: unknown = await response.json()
     body = parseGatewayErrorResponse(json)
@@ -42,11 +40,7 @@ async function parseErrorResponse(response: Response): Promise<GatewayApiError> 
     body = undefined
   }
 
-  return new GatewayApiError(
-    resolveGatewayErrorMessage(response.status, body),
-    response.status,
-    body?.error_code,
-  )
+  throw createGatewayApiError(response.status, body)
 }
 
 /**
