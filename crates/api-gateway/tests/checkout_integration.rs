@@ -4,11 +4,11 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use domain::MerchantId;
 use http_body_util::BodyExt;
-use oracle_client::AuthorizeResponse;
+use oracle_client::{AuthorizeResponse, HealthResponse};
 use tokio::net::TcpListener;
 use tower::ServiceExt;
 use uuid::Uuid;
@@ -19,18 +19,28 @@ async fn spawn_mock_oracle() -> String {
     let hold_id = Uuid::new_v4();
     let gateway_request_id = Uuid::new_v4();
 
-    let app = Router::new().route(
-        "/internal/v1/authorize",
-        post(move || async move {
-            Json(AuthorizeResponse {
-                hold_id,
-                brand: "visa".to_string(),
-                brand_code: 1,
-                last_four: "1111".to_string(),
-                gateway_request_id,
-            })
-        }),
-    );
+    let app = Router::new()
+        .route(
+            "/health",
+            get(|| async {
+                Json(HealthResponse {
+                    status: "ok".to_string(),
+                    service: "mock-oracle".to_string(),
+                })
+            }),
+        )
+        .route(
+            "/internal/v1/authorize",
+            post(move || async move {
+                Json(AuthorizeResponse {
+                    hold_id,
+                    brand: "visa".to_string(),
+                    brand_code: 1,
+                    last_four: "1111".to_string(),
+                    gateway_request_id,
+                })
+            }),
+        );
 
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
     let addr = listener.local_addr().expect("addr");
@@ -41,23 +51,32 @@ async fn spawn_mock_oracle() -> String {
     format!("http://{addr}")
 }
 
-fn test_state(oracle_base_url: String) -> AppState {
-    let config = Arc::new(AppConfig {
+fn test_config(oracle_base_url: String) -> Arc<AppConfig> {
+    Arc::new(AppConfig {
         host: "127.0.0.1".to_string(),
         port: 8080,
         oracle_base_url,
         oracle_api_key: "test-gateway-key".to_string(),
         oracle_timeout_secs: 2,
+        oracle_health_check: true,
         default_merchant_id: MerchantId::new(Uuid::new_v4()),
+        merchant_default_funding_type: None,
+        rail_fallback_enabled: true,
+        rail_configs: api_gateway::services::rails::default_rail_configs(),
         database_url: None,
-    });
-    AppState::new(config).expect("state")
+    })
+}
+
+async fn test_state(oracle_base_url: String) -> AppState {
+    AppState::new(test_config(oracle_base_url))
+        .await
+        .expect("state")
 }
 
 #[tokio::test]
 async fn checkout_returns_settled_with_mock_oracle() {
     let oracle_url = spawn_mock_oracle().await;
-    let app = build_app(test_state(oracle_url));
+    let app = build_app(test_state(oracle_url).await);
 
     let response = app
         .oneshot(
@@ -93,7 +112,7 @@ async fn checkout_returns_settled_with_mock_oracle() {
 
 #[tokio::test]
 async fn checkout_rejects_invalid_amount() {
-    let app = build_app(test_state(spawn_mock_oracle().await));
+    let app = build_app(test_state(spawn_mock_oracle().await).await);
 
     let response = app
         .oneshot(
@@ -110,4 +129,11 @@ async fn checkout_rejects_invalid_amount() {
         .expect("response");
 
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn startup_fails_when_oracle_health_unreachable() {
+    let config = test_config("http://127.0.0.1:1".to_string());
+    let result = AppState::new(config).await;
+    assert!(result.is_err());
 }

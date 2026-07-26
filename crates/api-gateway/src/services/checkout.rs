@@ -31,7 +31,13 @@ pub async fn process_checkout(
     let transaction_id = TransactionId::generate();
     let merchant_id = state.default_merchant_id;
 
-    let rail = select_rail(&state.rail_switcher, &input.request, amount, &currency)?;
+    let rail = select_rail(
+        &state.rail_switcher,
+        &state.rail_context,
+        &input.request,
+        amount,
+        &currency,
+    )?;
 
     let gateway_request_id = transaction_id.0;
     let authorize_request = AuthorizeRequest {
@@ -198,6 +204,7 @@ mod tests {
     use super::*;
     use crate::config::AppConfig;
     use crate::routes::CheckoutCardPayload;
+    use crate::services::RailContext;
     use crate::state::AppState;
 
     struct MockOracle {
@@ -268,14 +275,19 @@ mod tests {
             oracle_base_url: "http://mock".to_string(),
             oracle_api_key: "key".to_string(),
             oracle_timeout_secs: 2,
+            oracle_health_check: false,
             database_url: None,
             default_merchant_id: MerchantId::new(Uuid::new_v4()),
+            merchant_default_funding_type: None,
+            rail_fallback_enabled: true,
+            rail_configs: crate::services::rails::default_rail_configs(),
         });
         AppState::from_parts(
             config,
             oracle,
             SettlementEngine::with_stub_adapters(),
             RailSwitcher,
+            RailContext::default(),
         )
     }
 

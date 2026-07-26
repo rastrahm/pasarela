@@ -10,6 +10,7 @@ use settlement_adapters::SettlementEngine;
 use uuid::Uuid;
 
 use crate::config::AppConfig;
+use crate::services::rails::RailContext;
 
 /// Registro en memoria de una transacción (persistencia real en paso 4.12).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,24 +27,33 @@ pub struct AppState {
     pub settlement_engine: SettlementEngine,
     pub oracle_client: Arc<dyn OracleClient>,
     pub rail_switcher: RailSwitcher,
+    pub rail_context: RailContext,
     pub default_merchant_id: MerchantId,
     transactions: Arc<RwLock<HashMap<Uuid, TransactionRecord>>>,
 }
 
 impl AppState {
     /// Construye el estado a partir de configuración cargada.
-    pub fn new(config: Arc<AppConfig>) -> Result<Self, oracle_client::OracleClientError> {
+    ///
+    /// Verifica conectividad con el Oracle (`GET /health`) si
+    /// `GATEWAY_ORACLE_HEALTH_CHECK` está activo.
+    pub async fn new(config: Arc<AppConfig>) -> Result<Self, oracle_client::OracleClientError> {
         let oracle_client = Arc::new(HttpOracleClient::new(
             config.oracle_base_url.clone(),
             config.oracle_api_key.clone(),
             config.oracle_timeout_secs,
         )?);
 
+        if config.oracle_health_check {
+            oracle_client.health().await?;
+        }
+
         Ok(Self::from_parts(
-            config,
+            config.clone(),
             oracle_client,
             SettlementEngine::with_stub_adapters(),
             RailSwitcher,
+            config.rail_context(),
         ))
     }
 
@@ -53,6 +63,7 @@ impl AppState {
         oracle_client: Arc<dyn OracleClient>,
         settlement_engine: SettlementEngine,
         rail_switcher: RailSwitcher,
+        rail_context: RailContext,
     ) -> Self {
         Self {
             default_merchant_id: config.default_merchant_id,
@@ -60,6 +71,7 @@ impl AppState {
             settlement_engine,
             oracle_client,
             rail_switcher,
+            rail_context,
             transactions: Arc::new(RwLock::new(HashMap::new())),
         }
     }

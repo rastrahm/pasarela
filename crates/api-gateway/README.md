@@ -9,7 +9,7 @@ API Gateway y orquestador de checkout — **Fase 4, paso 4.5**.
 | Método | Ruta | Auth | Estado |
 |--------|------|------|--------|
 | `GET` | `/health` | — | ✅ |
-| `POST` | `/api/v1/checkout` | API key (4.11) + Idempotency-Key (4.10) | ✅ 4.6 |
+| `POST` | `/api/v1/checkout` | API key (4.11) + Idempotency-Key (4.10) | ✅ 4.6–4.7 |
 | `GET` | `/api/v1/transactions/{id}` | API key comercio | Stub → 4.8 |
 
 ## Arranque
@@ -32,5 +32,5 @@ cargo test -p api-gateway
 
 - `domain` — tipos compartidos
 - `oracle-client` — cliente HTTP hacia Oracle
-- `rail-switcher` — selección de riel (paso 4.7)
+- `rail-switcher` — selección de riel + fallback D3 (paso 4.7)
 - `settlement-adapters` — liquidación por riel
