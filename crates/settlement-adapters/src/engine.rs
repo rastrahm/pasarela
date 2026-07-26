@@ -36,12 +36,12 @@ impl SettlementEngine {
         Self { adapters: map }
     }
 
-    /// Crea un motor con adaptadores por defecto (Bank + Binance operativos; Solana stub).
+    /// Crea un motor con los tres adaptadores operativos (mock in-memory / simulados).
     pub fn with_stub_adapters() -> Self {
         Self::new([
             Arc::new(TraditionalBankAdapter) as Arc<dyn SettlementAdapter>,
             Arc::new(BinanceCexAdapter::default()),
-            Arc::new(SolanaWalletAdapter),
+            Arc::new(SolanaWalletAdapter::default()),
         ])
     }
 
@@ -154,16 +154,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn solana_stub_returns_settlement_failed() {
+    async fn all_stub_adapters_settle_successfully() {
         let engine = SettlementEngine::with_stub_adapters();
         let context = sample_context();
 
-        assert_eq!(
+        for rail in [
+            FundingType::TraditionalBank,
+            FundingType::BinanceCex,
+            FundingType::SolanaWallet,
+        ] {
             engine
-                .settle(FundingType::SolanaWallet, context)
-                .await,
-            Err(LiquidityError::SettlementFailed)
-        );
+                .settle(rail, context.clone())
+                .await
+                .expect("settled");
+        }
     }
 
     #[tokio::test]
@@ -192,5 +196,19 @@ mod tests {
 
         assert_eq!(receipt.rail, FundingType::BinanceCex);
         assert!(receipt.proof.starts_with("CEX-"));
+    }
+
+    #[tokio::test]
+    async fn solana_stub_settles_successfully() {
+        let engine = SettlementEngine::with_stub_adapters();
+        let context = sample_context();
+
+        let receipt = engine
+            .settle(FundingType::SolanaWallet, context)
+            .await
+            .expect("solana settled");
+
+        assert_eq!(receipt.rail, FundingType::SolanaWallet);
+        assert!(receipt.proof.starts_with("SOL-MEM-"));
     }
 }

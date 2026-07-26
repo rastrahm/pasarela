@@ -20,4 +20,10 @@ pub use binance::{
 pub use context::SettlementContext;
 pub use engine::SettlementEngine;
 pub use mock::MockSettlementAdapter;
-pub use solana::SolanaWalletAdapter;
+pub use solana::{
+    InMemorySolanaSettlementClient, ProcessPaymentAccounts, ProcessPaymentRequest,
+    ProcessPaymentResult, RpcSolanaSettlementClient, SolanaClientError, SolanaConfigError,
+    SolanaSettlementClient, SolanaSettlementConfig, SolanaWalletAdapter,
+    amount_to_base_units, build_process_payment_instruction, derive_process_payment_accounts,
+    process_payment_discriminator,
+};
