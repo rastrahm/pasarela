@@ -235,7 +235,7 @@
 |-------------|---------------------------|
 | **6.1** Playwright E2E | DT-P1-01, DT-P0-03, DT-P0-04 |
 | **6.2** Cross-service | DT-P0-01, DT-P1-03, DT-P1-05 |
-| **6.3** Checklist UC | DT-P1-04 (si casos edge complejos) |
+| **6.3** Checklist QA | DT-P0-03 runbook facilita items ⬜ manual |
 | **6.6** CI | DT-P0-02 |
 | **6.7** Runbook | DT-P0-03, DT-P0-04 |
 | **6.8** Deuda crítica | Revisar ítems P0 marcados como bloqueantes en esta tabla |
@@ -246,6 +246,7 @@
 
 | Fecha | Cambio |
 |-------|--------|
+| 2026-07-26 | Checklist QA Fase 6 — [Checklist-QA-Fase-6.md](./Checklist-QA-Fase-6.md) |
 | 2026-07-26 | DT-P0-01 mitigado — `cross_service_integration.rs` + `oracle/src/test_support.rs` |
 
 ---
