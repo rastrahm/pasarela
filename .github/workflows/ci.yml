@@ -1,0 +1,155 @@
+# Fase 6.6 — CI unificado: Rust + frontend + Playwright (E2E UI)
+# Anchor: ver programs-anchor-test.yml (path programs/payment-settlement)
+
+name: CI
+
+on:
+  push:
+    branches: [main, master, liquidacion]
+  pull_request:
+    branches: [main, master, liquidacion]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ORACLE_DATABASE_URL: postgres://postgres:postgres@localhost:5432/oracle_test
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Rust (workspace)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: oracle_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d oracle_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            oracle
+            antifraud
+            binance-sim
+
+      - name: cargo test (workspace)
+        run: cargo test --workspace -- --test-threads=1
+
+  frontend:
+    name: Frontend (Vitest + lint + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test:run
+
+      - name: Build
+        run: pnpm build
+
+  e2e:
+    name: Playwright (E2E UI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: tests/e2e
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: |
+            tests/e2e/pnpm-lock.yaml
+            frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Install E2E dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Run Playwright (UI + skip stack real sin Gateway)
+        run: pnpm test
+
+  ci-gate:
+    name: CI gate
+    runs-on: ubuntu-latest
+    needs: [rust, frontend, e2e]
+    if: always()
+    steps:
+      - name: Verificar jobs
+        run: |
+          if [[ "${{ needs.rust.result }}" != "success" ]] \
+            || [[ "${{ needs.frontend.result }}" != "success" ]] \
+            || [[ "${{ needs.e2e.result }}" != "success" ]]; then
+            echo "Uno o más jobs fallaron:"
+            echo "  rust:     ${{ needs.rust.result }}"
+            echo "  frontend: ${{ needs.frontend.result }}"
+            echo "  e2e:      ${{ needs.e2e.result }}"
+            exit 1
+          fi
+          echo "CI gate OK — rust + frontend + playwright"

@@ -44,7 +44,7 @@ Variables alineadas con `frontend/.env.example` y `crates/api-gateway/.env.examp
 
 Copiá `frontend/.env.example` → `frontend/.env.local` si usás otros valores.
 
-## Ejecución
+## Ejecución local
 
 ```bash
 cd tests/e2e
@@ -53,6 +53,10 @@ pnpm test:headed       # navegador visible
 pnpm test:ui           # UI mode
 pnpm report            # ver último reporte HTML
 ```
+
+## Ejecución en CI
+
+El job `e2e` de [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) ejecuta esta suite en cada push/PR (Node 20 + Chromium). Ver [Doc/CI.md](../../Doc/CI.md).
 
 ## Comportamiento
 

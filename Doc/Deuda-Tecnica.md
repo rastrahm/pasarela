@@ -37,10 +37,10 @@
 
 | Campo | Valor |
 |-------|-------|
-| **Estado** | Pendiente (Fase 6.6) |
-| **Evidencia** | Solo `.github/workflows/programs-anchor-test.yml` |
-| **Impacto** | Regresiones no detectadas en PR |
-| **Acción** | Workflow: `cargo test --workspace`, `pnpm test:run`, Playwright opcional con service containers |
+| **Estado** | **Resuelto** (2026-07-26) |
+| **Evidencia** | `.github/workflows/ci.yml` — jobs `rust`, `frontend`, `e2e` |
+| **Anchor** | `.github/workflows/programs-anchor-test.yml` (path-filtered) |
+| **Doc** | [Doc/CI.md](./CI.md) |
 
 ### DT-P0-03 — Runbook de stack local disperso
 
@@ -270,7 +270,7 @@
 
 | Fecha | Cambio |
 |-------|--------|
-| 2026-07-26 | Revisión rendimiento 6.5 — [Revision-Rendimiento-Fase-6.md](./Revision-Rendimiento-Fase-6.md) |
+| 2026-07-26 | CI unificado 6.6 — `.github/workflows/ci.yml` + [Doc/CI.md](./CI.md) |
 | 2026-07-26 | Revisión seguridad 6.4 — [Revision-Seguridad-Fase-6.md](./Revision-Seguridad-Fase-6.md); fixes IDOR + idempotency PCI |
 | 2026-07-26 | DT-P0-01 mitigado — `cross_service_integration.rs` + `oracle/src/test_support.rs` |
 
