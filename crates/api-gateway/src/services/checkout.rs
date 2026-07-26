@@ -171,10 +171,13 @@ pub async fn process_checkout(
             Ok(response)
         }
         Err(settlement_err) => {
-            let _ = state
-                .oracle_client
-                .release_hold(auth.hold_id, options)
-                .await;
+            release_hold_on_settlement_failure(
+                state,
+                transaction_id.0,
+                auth.hold_id,
+                options,
+            )
+            .await;
 
             state
                 .save_transaction(TransactionRecord {
@@ -210,6 +213,48 @@ fn parse_amount_and_currency(request: &CheckoutRequest) -> Result<(Amount, Curre
     let currency = Currency::new(&request.currency).map_err(|_| GatewayError::InvalidCard)?;
 
     Ok((amount, currency))
+}
+
+/// Libera el hold en Oracle cuando el settlement falla (UC-04 / paso 4.13).
+async fn release_hold_on_settlement_failure(
+    state: &AppState,
+    transaction_id: Uuid,
+    hold_id: Uuid,
+    options: RequestOptions,
+) {
+    match state.oracle_client.release_hold(hold_id, options).await {
+        Ok(response) => {
+            if let Err(err) = persist_audit(
+                state,
+                transaction_id,
+                "checkout.hold_released",
+                format!("hold_id={hold_id} status={}", response.status),
+            )
+            .await
+            {
+                tracing::warn!(%transaction_id, %hold_id, %err, "audit hold_released falló");
+            }
+            tracing::info!(%hold_id, %transaction_id, "hold liberado tras fallo de settlement");
+        }
+        Err(err) => {
+            if let Err(audit_err) = persist_audit(
+                state,
+                transaction_id,
+                "checkout.hold_release_failed",
+                format!("hold_id={hold_id} error={err}"),
+            )
+            .await
+            {
+                tracing::warn!(%transaction_id, %hold_id, %audit_err, "audit hold_release_failed falló");
+            }
+            tracing::warn!(
+                %hold_id,
+                %transaction_id,
+                %err,
+                "no se pudo liberar hold tras fallo de settlement"
+            );
+        }
+    }
 }
 
 fn to_oracle_card(card: &crate::routes::CheckoutCardPayload) -> CardPayload {
@@ -248,12 +293,12 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
-    use domain::{FundingType, MerchantId};
+    use domain::{FundingType, LiquidityError, MerchantId};
     use oracle_client::{
         AuthorizeResponse, HealthResponse, OracleClient, OracleClientError, ReleaseHoldResponse,
     };
     use rail_switcher::RailSwitcher;
-    use settlement_adapters::SettlementEngine;
+    use settlement_adapters::{MockSettlementAdapter, SettlementAdapter, SettlementEngine};
     use uuid::Uuid;
 
     use super::*;
@@ -325,6 +370,13 @@ mod tests {
     }
 
     fn test_state(oracle: Arc<dyn OracleClient>) -> (AppState, domain::MerchantId) {
+        test_state_with_settlement(oracle, SettlementEngine::with_stub_adapters())
+    }
+
+    fn test_state_with_settlement(
+        oracle: Arc<dyn OracleClient>,
+        settlement_engine: SettlementEngine,
+    ) -> (AppState, domain::MerchantId) {
         let merchant_id = MerchantId::new(Uuid::new_v4());
         let config = Arc::new(AppConfig {
             host: "127.0.0.1".to_string(),
@@ -344,7 +396,7 @@ mod tests {
         let state = AppState::from_parts(
             config,
             oracle,
-            SettlementEngine::with_stub_adapters(),
+            settlement_engine,
             RailSwitcher,
             RailContext::default(),
             Arc::new(MerchantRegistry::single("sk_test_validkey1", merchant_id)),
@@ -420,5 +472,34 @@ mod tests {
         .expect_err("error");
 
         assert!(matches!(err, GatewayError::InvalidCard));
+    }
+
+    #[tokio::test]
+    async fn checkout_releases_hold_when_settlement_fails() {
+        let release_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let oracle = Arc::new(MockOracle {
+            authorize_ok: true,
+            release_called: release_flag.clone(),
+        });
+        let failing_engine = SettlementEngine::new([Arc::new(
+            MockSettlementAdapter::new(FundingType::TraditionalBank, "unused")
+                .with_error(LiquidityError::SettlementFailed),
+        )
+            as Arc<dyn SettlementAdapter>]);
+        let (state, merchant_id) = test_state_with_settlement(oracle, failing_engine);
+
+        let err = process_checkout(
+            &state,
+            CheckoutInput {
+                merchant_id,
+                request: sample_request(),
+                caller_ip: None,
+            },
+        )
+        .await
+        .expect_err("settlement failure");
+
+        assert!(matches!(err, GatewayError::Internal(_)));
+        assert!(release_flag.load(std::sync::atomic::Ordering::SeqCst));
     }
 }
