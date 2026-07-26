@@ -333,7 +333,7 @@ Entrada: PaymentRequest + RailPreference (opcional)
 
 Si `antifraud/` no responde en timeout → Oracle rechaza con decline (**fail closed**, D11).
 
-### 6.2 API Gateway y Orquestador (Fase 4)
+### 6.2 API Gateway y Orquestador ✅ (Fase 4 — cerrada 2026-07-26)
 
 **Endpoints principales**:
 
@@ -781,7 +781,7 @@ El desarrollo es **secuencial y modular**. No se avanza a la siguiente fase sin 
 | **1** | Dominio y Abstracción de Rieles | Traits, structs, enums, Rail Switcher (fallback D3) | Fase 0 |
 | **2** | Oracle + Antifraude | `oracle/` completo + `antifraud/` simulado (D11) | Contrato API; paralelo con Fase 3 |
 | **3** | Motor de Liquidación On-Chain | Programa Anchor; local validator + devnet CI (D2) | Fase 1 |
-| **4** | API Gateway y Orquestación | Axum Gateway, Settlement, idempotencia (D9), auth comercio (D12) | Fases 1, 2, 3 |
+| **4** | API Gateway y Orquestación | Axum Gateway, Settlement, idempotencia (D9), auth comercio (D12) | Fases 1, 2, 3 ✅ |
 | **5** | Frontend (Dashboard & Checkout) | React + Tailwind, conexión al Gateway | Fase 4 |
 | **7/8** | Staging / Producción | mTLS (D7), TLS, secretos, monitoreo | Fases 5–6 |
 
@@ -802,10 +802,10 @@ El desarrollo es **secuencial y modular**. No se avanza a la siguiente fase sin 
 | **D6** | Tokenización PAN | **Hash en memoria** en Oracle; PAN descartado tras validación Luhn (MVP) |
 | **D7** | mTLS Gateway ↔ Oracle | **MVP**: `X-API-KEY` + allowlist; **mTLS en Fase 7/8** (staging/producción) |
 | **D8** | 3-D Secure (SCA) | **Fuera de scope MVP** — documentado como post-MVP |
-| **D9** | Idempotency-Key | **Implementar en Fase 4** (Gateway), obligatorio antes de staging |
+| **D9** | Idempotency-Key | ✅ **Implementado** en Gateway (Fase 4) — obligatorio en checkout |
 | **D10** | Commitment level Solana | **`finalized`** antes de confirmar éxito al cliente |
 | **D11** | Motor antifraude | **Servicio externo simulado** (microservicio aparte; Oracle lo invoca) |
-| **D12** | Auth comercio en Gateway | **API key por comercio** (estilo `sk_test_...` / `sk_live_...`) en Fase 4 |
+| **D12** | Auth comercio en Gateway | ✅ **API key por comercio** (`sk_test_...` / `sk_live_...`) — Fase 4 |
 
 ### Implicaciones de las decisiones
 
@@ -853,6 +853,7 @@ Estas se resolverán al abordar producción real:
 - [Contexto General.md](./Contexto%20General.md) — Prompt maestro y fases del proyecto
 - [Plan-de-Implementacion.md](./Plan-de-Implementacion.md) — Hoja de ruta hasta producción
 - [Acta-Cierre-Fase-0.md](./Acta-Cierre-Fase-0.md) — Gate Fase 0 (2026-07-25)
+- [Acta-Cierre-Fase-4.md](./Acta-Cierre-Fase-4.md) — Gate Fase 4 (2026-07-26)
 - [Casos-de-Uso-ER-Flujos.md](./Casos-de-Uso-ER-Flujos.md) — UC, ER y flujos operativos
 - `rust.cursorrules` — Directivas de desarrollo Rust
 - `solana.cursorrules` — Directivas Anchor y seguridad on-chain

@@ -1,8 +1,8 @@
 # settlement-adapters
 
-Adaptadores de liquidación por riel — **Strategy pattern** (Fase 4, paso 4.1).
+Adaptadores de liquidación por riel — **Strategy pattern** (Fase 4 ✅).
 
-> Consumidor previsto: **API Gateway** (`crates/api-gateway/`). El Oracle gestiona holds; estos adaptadores ejecutan el asentamiento en el riel activo.
+> Consumidor: **API Gateway** (`crates/api-gateway/`). El Oracle gestiona holds; estos adaptadores ejecutan el asentamiento en el riel activo.
 
 ## Rieles
 

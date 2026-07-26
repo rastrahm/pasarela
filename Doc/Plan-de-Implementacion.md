@@ -12,8 +12,8 @@
 | **Objetivo** | Procesador de pagos con tarjeta y liquidación mutable en tres rieles (Banco, Binance CEX, Solana) |
 | **Enfoque** | Desarrollo secuencial por fases; confirmación explícita antes de avanzar |
 | **Unidades de despliegue** | `pasarela/` + `oracle/` + `antifraud/` (monorepo D5) |
-| **Fase actual** | **Fase 3 — Solana/Anchor** *(3.10 documentación cerrada 2026-07-25)* |
-| **Próximo hito** | Gate Fase 3 (acta) + confirmación Fase 4 |
+| **Fase actual** | **Fase 4 — API Gateway** *(cerrada 2026-07-26)* |
+| **Próximo hito** | **Fase 5 — Frontend** (Dashboard & Checkout) |
 
 ### Estado actual del repositorio
 
@@ -22,7 +22,7 @@
 | Documentación de arquitectura | ✅ Completada |
 | Casos de uso, ER y flujos | ✅ Completados |
 | Esqueleto `oracle/` | ✅ Completo (67 tests, persistencia, seguridad) |
-| Workspace `pasarela/` (crates, programs, frontend) | ✅ `domain`, `rail-switcher`, `oracle-client`; `programs/payment-settlement/` en devnet |
+| Workspace `pasarela/` (crates, programs, frontend) | ✅ `domain`, `rail-switcher`, `oracle-client`, `settlement-adapters`, `api-gateway`; `programs/payment-settlement/` en devnet |
 | CI/CD | ⬜ Pendiente (Rust) · ✅ `programs-anchor-test` workflow |
 | Despliegue producción | ⬜ Pendiente |
 
@@ -105,10 +105,10 @@ Definir qué se construye, cómo se descompone, qué restricciones aplican y có
 | D6 | Tokenización PAN | **Hash en memoria**; PAN descartado post-Luhn |
 | D7 | mTLS | **Fase 7/8**; MVP con X-API-KEY + allowlist |
 | D8 | 3-D Secure | **Post-MVP** (fuera de scope) |
-| D9 | Idempotency-Key | **Fase 4** (Gateway) |
+| D9 | Idempotency-Key | ✅ **Implementado** — Gateway (Fase 4) |
 | D10 | Commitment Solana | **`finalized`** |
 | D11 | Antifraude | **Servicio externo simulado** (`antifraud/`) |
-| D12 | Auth comercio | **API key por comercio** en Fase 4 |
+| D12 | Auth comercio | ✅ **API key por comercio** — Gateway (Fase 4) |
 
 Detalle e implicaciones: [Arquitectura §12](./Arquitectura.md#12-decisiones-de-diseño--resueltas-fase-0).
 
@@ -251,11 +251,15 @@ programs/payment-settlement/
 - [x] Integer overflow rechazado
 - [x] Firma no autorizada rechazada
 - [x] Evento emitido sin PII
-- [ ] Confirmación explícita para Fase 4
+- [x] Confirmación explícita para Fase 4
+
+> Acta de cierre Fase 3: pendiente formalización; gate técnico Solana verificado (17 tests Anchor).
 
 ---
 
 ## 8. Fase 4 — API Gateway y orquestación
+
+> **Estado: CERRADA** · Acta: [Acta-Cierre-Fase-4.md](./Acta-Cierre-Fase-4.md) (2026-07-26)
 
 ### Objetivo
 
@@ -265,20 +269,20 @@ Backend principal: recibe checkout, orquesta Oracle, ejecuta settlement en el ri
 
 | # | Paso | Detalle |
 |---|------|---------|
-| 4.1 | Crear crate `crates/settlement-adapters/` | Strategy por riel: Bank, Binance, Solana |
-| 4.2 | Implementar adapter `TraditionalBank` | Generación ISO 20022 / ACH simulado |
-| 4.3 | Implementar adapter `BinanceCex` | API simulada + spread buffer |
-| 4.4 | Implementar adapter `SolanaWallet` | `solana-client` → `process_payment`; esperar commitment **`finalized`** |
-| 4.5 | Crear crate `crates/api-gateway/` | Axum, config, routes |
-| 4.6 | Implementar `POST /api/v1/checkout` | Orquestador completo |
-| 4.7 | Integrar `rail-switcher` + `oracle-client` | Selección de riel + autorización |
-| 4.8 | Implementar `GET /api/v1/transactions/{id}` | Consulta de estado (UC-09) |
-| 4.9 | Mapeo de errores HTTP | 200, 402, 422, 401, 503, 500 (§6.2) |
-| 4.10 | Idempotencia (`Idempotency-Key`) | Obligatorio (decisión D9); evitar doble cargo |
-| 4.11 | Auth API key por comercio | Decisión D12: `sk_test_...` / `sk_live_...` |
-| 4.12 | Persistencia Gateway | TRANSACTION, SETTLEMENT, GATEWAY_AUDIT_LOG, MERCHANT |
-| 4.13 | Liberar hold en Oracle si settlement falla | `POST /internal/v1/hold/release` |
-| 4.14 | Tests de integración | Gateway + mock Oracle + mock rieles |
+| 4.1 | Crear crate `crates/settlement-adapters/` | ✅ Strategy por riel: Bank, Binance, Solana |
+| 4.2 | Implementar adapter `TraditionalBank` | ✅ Generación ISO 20022 / ACH simulado |
+| 4.3 | Implementar adapter `BinanceCex` | ✅ API simulada + spread buffer |
+| 4.4 | Implementar adapter `SolanaWallet` | ✅ `solana-client` → `process_payment`; commitment **`finalized`** |
+| 4.5 | Crear crate `crates/api-gateway/` | ✅ Axum, config, routes |
+| 4.6 | Implementar `POST /api/v1/checkout` | ✅ Orquestador completo |
+| 4.7 | Integrar `rail-switcher` + `oracle-client` | ✅ Selección de riel + autorización |
+| 4.8 | Implementar `GET /api/v1/transactions/{id}` | ✅ Consulta de estado (UC-09) |
+| 4.9 | Mapeo de errores HTTP | ✅ 200, 402, 422, 401, 503, 500 (§6.2) |
+| 4.10 | Idempotencia (`Idempotency-Key`) | ✅ Obligatorio (decisión D9) |
+| 4.11 | Auth API key por comercio | ✅ Decisión D12: `sk_test_...` / `sk_live_...` |
+| 4.12 | Persistencia Gateway | ✅ TRANSACTION, SETTLEMENT, GATEWAY_AUDIT_LOG, MERCHANT |
+| 4.13 | Liberar hold en Oracle si settlement falla | ✅ `POST /internal/v1/hold/release` |
+| 4.14 | Tests de integración | ✅ Gateway + mock Oracle + mock rieles |
 
 ### Flujo a validar
 
@@ -292,12 +296,14 @@ Frontend → POST /api/v1/checkout
 
 ### Criterios de aceptación (gate)
 
-- [ ] Checkout completo funcional vía curl/Postman (sin frontend)
-- [ ] Los tres rieles liquidan y devuelven proof distinto
-- [ ] Fallback de riel operativo (si habilitado)
-- [ ] Hold liberado si settlement falla
-- [ ] `cargo test` + tests integración verdes
-- [ ] Confirmación explícita para Fase 5
+- [x] Checkout completo funcional vía curl/Postman (sin frontend)
+- [x] Los tres rieles liquidan y devuelven proof distinto
+- [x] Fallback de riel operativo (si habilitado)
+- [x] Hold liberado si settlement falla
+- [x] `cargo test` + tests integración verdes
+- [x] Confirmación explícita para Fase 5
+
+> Acta de cierre: [Acta-Cierre-Fase-4.md](./Acta-Cierre-Fase-4.md) (2026-07-26)
 
 ---
 
@@ -591,6 +597,8 @@ Cada transición requiere **confirmación explícita** (según Contexto General)
 | [Casos-de-Uso-ER-Flujos.md](./Casos-de-Uso-ER-Flujos.md) | UC, ER, flujos para QA |
 | [Contexto General.md](./Contexto%20General.md) | Prompt maestro y regla de confirmación |
 | `oracle/README.md` | Operación del servicio Oracle |
+| `crates/api-gateway/README.md` | Operación del Gateway, curl/Postman |
+| [Acta-Cierre-Fase-4.md](./Acta-Cierre-Fase-4.md) | Gate Fase 4 (2026-07-26) |
 | `rust.cursorrules` / `solana.cursorrules` / `react.cursorrules` / `qa.cursorrules` | Estándares de código |
 
 ---
@@ -598,5 +606,5 @@ Cada transición requiere **confirmación explícita** (según Contexto General)
 ## 17. Próxima acción inmediata
 
 1. ~~**Cerrar Fase 0**~~ ✅ Ver [Acta-Cierre-Fase-0.md](./Acta-Cierre-Fase-0.md).
-2. **Iniciar Fase 1**: crear workspace Cargo en `pasarela/` con crates `domain` y `rail-switcher`.
-3. **En paralelo (opcional)**: continuar Fase 2 en `oracle/` (persistencia, antifraud client) tras contrato de dominio.
+2. ~~**Fases 1–4**~~ ✅ Dominio, Oracle, Solana, Gateway — ver actas de cierre.
+3. **Iniciar Fase 5**: crear `frontend/` con Vite + React + TypeScript + Tailwind; conectar checkout al Gateway (`VITE_API_BASE_URL`).
