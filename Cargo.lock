@@ -151,12 +151,14 @@ name = "api-gateway"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum",
  "domain",
  "dotenvy",
  "http-body-util",
  "oracle-client",
  "rail-switcher",
+ "rust_decimal",
  "serde",
  "serde_json",
  "settlement-adapters",

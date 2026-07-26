@@ -1,11 +1,14 @@
 //! Tests de integración HTTP del API Gateway.
 
+use std::sync::Arc;
+
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use api_gateway::{build_app, config::AppConfig, state::AppState};
+use domain::MerchantId;
 use http_body_util::BodyExt;
-use std::sync::Arc;
 use tower::ServiceExt;
+use uuid::Uuid;
 
 fn test_state() -> AppState {
     let config = Arc::new(AppConfig {
@@ -14,6 +17,7 @@ fn test_state() -> AppState {
         oracle_base_url: "http://127.0.0.1:8081".to_string(),
         oracle_api_key: "test-gateway-key".to_string(),
         oracle_timeout_secs: 2,
+        default_merchant_id: MerchantId::new(Uuid::new_v4()),
         database_url: None,
     });
     AppState::new(config).expect("state")
@@ -44,27 +48,6 @@ async fn health_returns_ok() {
     let json: serde_json::Value = serde_json::from_slice(&bytes).expect("json");
     assert_eq!(json["status"], "ok");
     assert_eq!(json["service"], "api-gateway");
-}
-
-#[tokio::test]
-async fn checkout_route_is_registered() {
-    let app = build_app(test_state());
-
-    let response = app
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/v1/checkout")
-                .header("content-type", "application/json")
-                .body(Body::from(
-                    r#"{"amount":100.0,"currency":"USD","card":{"pan":"4111111111111111","expiry_month":"12","expiry_year":"2030","cvv":"123","cardholder":"Test User"}}"#,
-                ))
-                .expect("request"),
-        )
-        .await
-        .expect("response");
-
-    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
 }
 
 #[tokio::test]

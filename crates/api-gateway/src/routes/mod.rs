@@ -6,12 +6,14 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Path, State},
+    http::HeaderMap,
     routing::{get, post},
     Json, Router,
 };
 use uuid::Uuid;
 
 use crate::error::GatewayError;
+use crate::services::{extract_caller_ip, process_checkout, CheckoutInput};
 use crate::state::AppState;
 
 pub use dto::{
@@ -35,12 +37,22 @@ async fn health() -> Json<HealthResponse> {
     })
 }
 
-/// Checkout completo — orquestador (implementación en paso 4.6).
+/// Checkout completo — autorización Oracle + liquidación en riel activo (UC-01).
 async fn checkout(
-    State(_state): State<Arc<AppState>>,
-    Json(_body): Json<CheckoutRequest>,
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<CheckoutRequest>,
 ) -> Result<Json<CheckoutResponse>, GatewayError> {
-    Err(GatewayError::NotImplemented("checkout"))
+    let response = process_checkout(
+        state.as_ref(),
+        CheckoutInput {
+            request: body,
+            caller_ip: extract_caller_ip(&headers),
+        },
+    )
+    .await?;
+
+    Ok(Json(response))
 }
 
 /// Consulta de estado de transacción (implementación en paso 4.8).

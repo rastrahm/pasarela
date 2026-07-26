@@ -4,6 +4,7 @@ pub mod config;
 pub mod error;
 pub mod logging;
 pub mod routes;
+pub mod services;
 pub mod state;
 
 use std::sync::Arc;

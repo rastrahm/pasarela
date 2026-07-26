@@ -3,6 +3,8 @@
 use std::env;
 
 use anyhow::{Context, Result};
+use domain::MerchantId;
+use uuid::Uuid;
 
 /// Configuración del servicio Gateway.
 #[derive(Debug, Clone)]
@@ -12,15 +14,14 @@ pub struct AppConfig {
     pub oracle_base_url: String,
     pub oracle_api_key: String,
     pub oracle_timeout_secs: u64,
+    /// Comercio por defecto hasta auth API key (paso 4.11).
+    pub default_merchant_id: MerchantId,
     /// Reservada para persistencia (paso 4.12).
     pub database_url: Option<String>,
 }
 
 impl AppConfig {
     /// Carga configuración desde el entorno.
-    ///
-    /// # Returns
-    /// `AppConfig` o error si faltan variables críticas de Oracle.
     pub fn from_env() -> Result<Self> {
         let host = env::var("GATEWAY_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
         let port = env::var("GATEWAY_PORT")
@@ -38,6 +39,12 @@ impl AppConfig {
             .parse()
             .context("ORACLE_TIMEOUT_SECS inválido")?;
 
+        let default_merchant_id = env::var("GATEWAY_DEFAULT_MERCHANT_ID")
+            .ok()
+            .and_then(|raw| Uuid::parse_str(&raw).ok())
+            .map(MerchantId::new)
+            .unwrap_or_else(|| MerchantId::new(Uuid::new_v4()));
+
         let database_url = env::var("DATABASE_URL").ok();
 
         Ok(Self {
@@ -46,6 +53,7 @@ impl AppConfig {
             oracle_base_url,
             oracle_api_key,
             oracle_timeout_secs,
+            default_merchant_id,
             database_url,
         })
     }
