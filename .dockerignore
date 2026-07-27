@@ -1,0 +1,28 @@
+# Build artifacts
+target/
+**/target/
+frontend/node_modules/
+frontend/dist/
+tests/e2e/node_modules/
+tests/e2e/test-results/
+tests/e2e/playwright-report/
+
+# Git y IDE
+.git/
+.gitignore
+.cursor/
+.vscode/
+
+# Secretos locales (nunca en imagen)
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Docs y pruebas no necesarias en runtime
+Doc/
+tests/
+programs/payment-settlement/target/
+programs/payment-settlement/.anchor/
+
+# Deploy staging (evita recursión en context)
+deploy/staging/.env

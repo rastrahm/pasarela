@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# Sincroniza deploy/staging/.env → .env de cada servicio (modo native local).
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+STAGING_ENV="$ROOT/deploy/staging/.env"
+
+get() {
+  grep -E "^${1}=" "$STAGING_ENV" | head -1 | cut -d= -f2- | tr -d '"'
+}
+
+if [[ ! -f "$STAGING_ENV" ]]; then
+  echo "ERROR: falta $STAGING_ENV" >&2
+  exit 1
+fi
+
+ORACLE_KEY="$(get ORACLE_API_KEY)"
+ANTIFRAUD_KEY="$(get ANTIFRAUD_API_KEY)"
+BINANCE_KEY="$(get BINANCE_CEX_API_KEY)"
+GATEWAY_KEY="$(get GATEWAY_TEST_API_KEY)"
+MERCHANT_ID="$(get GATEWAY_DEFAULT_MERCHANT_ID)"
+PG_USER="$(get POSTGRES_USER)"
+PG_PASS="$(get POSTGRES_PASSWORD)"
+
+# Oracle usa postgres local del host (native)
+ORACLE_DB="${ORACLE_DATABASE_URL:-postgres://postgres:postgre@localhost:5432/oracle}"
+
+mkdir -p "$ROOT/antifraud" "$ROOT/binance-sim" "$ROOT/oracle" "$ROOT/crates/api-gateway" "$ROOT/frontend"
+
+cat > "$ROOT/antifraud/.env" <<EOF
+ANTIFRAUD_HOST=0.0.0.0
+ANTIFRAUD_PORT=8082
+RUST_LOG=antifraud_service=info,tower_http=info
+ANTIFRAUD_API_KEY=${ANTIFRAUD_KEY}
+ANTIFRAUD_MAX_AMOUNT=$(get ANTIFRAUD_MAX_AMOUNT)
+ANTIFRAUD_DECLINE_SCORE_THRESHOLD=$(get ANTIFRAUD_DECLINE_SCORE_THRESHOLD)
+EOF
+
+cat > "$ROOT/binance-sim/.env" <<EOF
+BINANCE_SIM_HOST=0.0.0.0
+BINANCE_SIM_PORT=8083
+RUST_LOG=binance_sim_service=info
+BINANCE_CEX_API_KEY=${BINANCE_KEY}
+BINANCE_CEX_BALANCE=$(get BINANCE_CEX_BALANCE)
+EOF
+
+cat > "$ROOT/oracle/.env" <<EOF
+ORACLE_HOST=0.0.0.0
+ORACLE_PORT=8081
+RUST_LOG=oracle_authorization=info,tower_http=info
+ORACLE_DATABASE_URL=${ORACLE_DB}
+ORACLE_API_KEY=${ORACLE_KEY}
+ORACLE_ALLOWED_CALLERS=$(get ORACLE_ALLOWED_CALLERS)
+ORACLE_RATE_LIMIT_PER_MINUTE=200
+ORACLE_RAIL_TIMEOUT_SECS=10
+ORACLE_HOLD_TTL_SECS=300
+ORACLE_TTL_CLEANUP_INTERVAL_SECS=60
+TRADITIONAL_BANK_BALANCE=$(get TRADITIONAL_BANK_BALANCE)
+BINANCE_CEX_BALANCE=$(get BINANCE_CEX_BALANCE)
+SOLANA_WALLET_BALANCE=$(get SOLANA_WALLET_BALANCE)
+BINANCE_SPREAD_BUFFER_PCT=$(get BINANCE_SPREAD_BUFFER_PCT)
+BINANCE_CEX_BASE_URL=http://127.0.0.1:8083
+BINANCE_CEX_API_KEY=${BINANCE_KEY}
+SOLANA_RPC_URL=$(get SOLANA_RPC_URL)
+SOLANA_WALLET_PUBKEY=$(get SOLANA_WALLET_PUBKEY)
+SOLANA_TOKEN_MINT=$(get SOLANA_TOKEN_MINT)
+PAYMENT_SETTLEMENT_PROGRAM_ID=$(get PAYMENT_SETTLEMENT_PROGRAM_ID)
+ANTIFRAUD_BASE_URL=http://127.0.0.1:8082
+ANTIFRAUD_API_KEY=${ANTIFRAUD_KEY}
+ANTIFRAUD_TIMEOUT_SECS=5
+EOF
+
+cat > "$ROOT/crates/api-gateway/.env" <<EOF
+GATEWAY_HOST=0.0.0.0
+GATEWAY_PORT=8080
+ORACLE_BASE_URL=http://127.0.0.1:8081
+ORACLE_API_KEY=${ORACLE_KEY}
+ORACLE_TIMEOUT_SECS=10
+GATEWAY_ORACLE_HEALTH_CHECK=true
+GATEWAY_TEST_API_KEY=${GATEWAY_KEY}
+GATEWAY_DEFAULT_MERCHANT_ID=${MERCHANT_ID}
+GATEWAY_DEFAULT_FUNDING_TYPE=traditional_bank
+GATEWAY_RAIL_FALLBACK_ENABLED=true
+RUST_LOG=api_gateway=info,tower_http=info
+EOF
+
+PUBLIC_URL="$(get PUBLIC_BASE_URL)"
+cat > "$ROOT/frontend/.env.local" <<EOF
+VITE_API_BASE_URL=${PUBLIC_URL}
+VITE_GATEWAY_API_KEY=${GATEWAY_KEY}
+EOF
+
+echo "OK — secretos sincronizados desde deploy/staging/.env"
+echo "  antifraud/.env, binance-sim/.env, oracle/.env"
+echo "  crates/api-gateway/.env, frontend/.env.local"

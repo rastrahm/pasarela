@@ -38,7 +38,10 @@ cargo test -p api-gateway --test cross_service_integration -- --test-threads=1
 # Frontend
 cd frontend && pnpm test:run
 
-# E2E UI (stack levantado)
+# Contrato fixtures canónicos
+cargo test -p api-gateway --test contract_fixtures
+
+# E2E Playwright — stack completo (6 tests)
 cd tests/e2e && pnpm test
 
 # Anchor (UC-07 on-chain)
@@ -67,7 +70,7 @@ cd programs/payment-settlement && anchor test
 | UC-01-12 | Riel no disponible | `503 RAIL_UNAVAILABLE` | ✅ | `error_mapping_integration::no_viable_rail_returns_503` |
 | UC-01-13 | Error interno settlement | `500`; hold liberado | ✅ | `e2e_integration::gate_hold_released_when_settlement_fails`, `cross_service_integration::cross_service_hold_released_when_settlement_fails` |
 | UC-01-14 | Monto inválido (≤ 0) | `422` Gateway | ✅ | `checkout_integration::checkout_rejects_invalid_amount` |
-| UC-01-15 | Checkout manual navegador | UI settled + comprobante | ⬜ | `frontend/README.md` — verificar con stack levantado |
+| UC-01-15 | Checkout manual navegador | UI settled + comprobante | ✅ | Playwright `checkout exitoso — riel *` (2026-07-26, stack local) |
 | UC-01-16 | Latencia checkout ~1–3 s | Sin timeout UX | ⏭ | Paso 6.5 rendimiento |
 
 **Verificación manual UC-01-15:**
@@ -156,7 +159,7 @@ cd programs/payment-settlement && anchor test
 | UC-06-02 | Débito HTTP simulador | `POST /spot/debit` | 🔄 | `settlement-adapters` unit tests; E2E con binance-sim ⬜ |
 | UC-06-03 | API Binance timeout | Hold liberado; `503` | ⏭ | Pendiente test integración binance-sim caído |
 | UC-06-04 | Saldo cambió entre hold y settle | Rechazo; hold liberado | ⏭ | Post-MVP |
-| UC-06-05 | E2E con binance-sim levantado | Checkout real Binance | ⬜ | Requiere stack completo (runbook 6.7) |
+| UC-06-05 | E2E con binance-sim levantado | Checkout real Binance | ✅ | Playwright `checkout exitoso — riel binance_cex` (2026-07-26) |
 
 ---
 
@@ -278,7 +281,7 @@ cd programs/payment-settlement && anchor test
 
 | Prioridad | Item | UC | Paso Fase 6 |
 |-----------|------|-----|-------------|
-| P0 | E2E Playwright 3 rieles con stack real | UC-01, UC-10 | 6.1 |
+| P0 | E2E Playwright 3 rieles con stack real | UC-01, UC-10 | 6.1 ✅ local 2026-07-26 — ver [Pruebas.md](./Pruebas.md) |
 | P0 | Runbook stack local | Todos | 6.7 ✅ [Runbook-Desarrollo.md](./Runbook-Desarrollo.md) |
 | P1 | E2E binance-sim + settlement HTTP real | UC-06 | 6.2 extensión |
 | P1 | Pantalla UC-09 | UC-09 | Post-MVP |
@@ -303,6 +306,7 @@ cd programs/payment-settlement && anchor test
 
 ## Referencias
 
+- [Pruebas.md](./Pruebas.md)
 - [Casos-de-Uso-ER-Flujos.md](./Casos-de-Uso-ER-Flujos.md)
 - [Plan-de-Implementacion.md §10](./Plan-de-Implementacion.md#10-fase-6--integración-qa-y-hardening)
 - [Deuda-Tecnica.md](./Deuda-Tecnica.md)

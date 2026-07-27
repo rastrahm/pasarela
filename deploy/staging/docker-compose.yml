@@ -1,0 +1,196 @@
+# Pasarela Multi-Rail — stack staging (Fase 7)
+# Contexto de build: raíz del monorepo (../.. desde este directorio).
+
+name: pasarela-staging
+
+x-rust-service: &rust-service
+  restart: unless-stopped
+  networks:
+    - backend
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    networks:
+      - backend
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pasarela}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requerida}
+      POSTGRES_DB: pasarela_gateway
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init-databases.sql:/docker-entrypoint-initdb.d/02-oracle-db.sql:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-pasarela} -d pasarela_gateway",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  antifraud:
+    <<: *rust-service
+    build:
+      context: ../..
+      dockerfile: deploy/staging/Dockerfile.rust
+      args:
+        PACKAGE: antifraud-service
+        BINARY: antifraud-service
+    environment:
+      SERVICE_PORT: "8082"
+      ANTIFRAUD_HOST: 0.0.0.0
+      ANTIFRAUD_PORT: "8082"
+      ANTIFRAUD_API_KEY: ${ANTIFRAUD_API_KEY:?ANTIFRAUD_API_KEY requerida}
+      ANTIFRAUD_MAX_AMOUNT: ${ANTIFRAUD_MAX_AMOUNT:-50000}
+      ANTIFRAUD_DECLINE_SCORE_THRESHOLD: ${ANTIFRAUD_DECLINE_SCORE_THRESHOLD:-0.85}
+      RUST_LOG: ${RUST_LOG:-antifraud_service=info}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8082/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 25s
+      retries: 5
+
+  binance-sim:
+    <<: *rust-service
+    build:
+      context: ../..
+      dockerfile: deploy/staging/Dockerfile.rust
+      args:
+        PACKAGE: binance-sim-service
+        BINARY: binance-sim-service
+    environment:
+      SERVICE_PORT: "8083"
+      BINANCE_SIM_HOST: 0.0.0.0
+      BINANCE_SIM_PORT: "8083"
+      BINANCE_CEX_API_KEY: ${BINANCE_CEX_API_KEY:?BINANCE_CEX_API_KEY requerida}
+      BINANCE_CEX_BALANCE: ${BINANCE_CEX_BALANCE:-50000}
+      RUST_LOG: ${RUST_LOG:-binance_sim_service=info}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8083/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 25s
+      retries: 5
+
+  oracle:
+    <<: *rust-service
+    build:
+      context: ../..
+      dockerfile: deploy/staging/Dockerfile.rust
+      args:
+        PACKAGE: oracle-authorization
+        BINARY: oracle-authorization
+    depends_on:
+      postgres:
+        condition: service_healthy
+      antifraud:
+        condition: service_healthy
+      binance-sim:
+        condition: service_healthy
+    environment:
+      SERVICE_PORT: "8081"
+      ORACLE_HOST: 0.0.0.0
+      ORACLE_PORT: "8081"
+      ORACLE_DATABASE_URL: postgres://${POSTGRES_USER:-pasarela}:${POSTGRES_PASSWORD}@postgres:5432/oracle
+      ORACLE_API_KEY: ${ORACLE_API_KEY:?ORACLE_API_KEY requerida}
+      ORACLE_ALLOWED_CALLERS: ${ORACLE_ALLOWED_CALLERS:-0.0.0.0/0,::/0}
+      ORACLE_RATE_LIMIT_PER_MINUTE: ${ORACLE_RATE_LIMIT_PER_MINUTE:-200}
+      ORACLE_RAIL_TIMEOUT_SECS: "10"
+      ORACLE_HOLD_TTL_SECS: "300"
+      ORACLE_TTL_CLEANUP_INTERVAL_SECS: "60"
+      TRADITIONAL_BANK_BALANCE: ${TRADITIONAL_BANK_BALANCE:-100000}
+      BINANCE_CEX_BALANCE: ${BINANCE_CEX_BALANCE:-50000}
+      SOLANA_WALLET_BALANCE: ${SOLANA_WALLET_BALANCE:-25000}
+      BINANCE_SPREAD_BUFFER_PCT: ${BINANCE_SPREAD_BUFFER_PCT:-0.02}
+      BINANCE_CEX_BASE_URL: http://binance-sim:8083
+      BINANCE_CEX_API_KEY: ${BINANCE_CEX_API_KEY}
+      ANTIFRAUD_BASE_URL: http://antifraud:8082
+      ANTIFRAUD_API_KEY: ${ANTIFRAUD_API_KEY}
+      ANTIFRAUD_TIMEOUT_SECS: "5"
+      SOLANA_RPC_URL: ${SOLANA_RPC_URL:-https://api.devnet.solana.com}
+      SOLANA_WALLET_PUBKEY: ${SOLANA_WALLET_PUBKEY:?SOLANA_WALLET_PUBKEY requerida}
+      SOLANA_TOKEN_MINT: ${SOLANA_TOKEN_MINT:?SOLANA_TOKEN_MINT requerida}
+      PAYMENT_SETTLEMENT_PROGRAM_ID: ${PAYMENT_SETTLEMENT_PROGRAM_ID:-4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564B}
+      RUST_LOG: ${RUST_LOG:-oracle_authorization=info,tower_http=info}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8081/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 40s
+      retries: 8
+
+  gateway:
+    <<: *rust-service
+    build:
+      context: ../..
+      dockerfile: deploy/staging/Dockerfile.rust
+      args:
+        PACKAGE: api-gateway
+        BINARY: api-gateway
+    depends_on:
+      postgres:
+        condition: service_healthy
+      oracle:
+        condition: service_healthy
+    networks:
+      - backend
+    environment:
+      SERVICE_PORT: "8080"
+      GATEWAY_HOST: 0.0.0.0
+      GATEWAY_PORT: "8080"
+      DATABASE_URL: postgres://${POSTGRES_USER:-pasarela}:${POSTGRES_PASSWORD}@postgres:5432/pasarela_gateway
+      ORACLE_BASE_URL: http://oracle:8081
+      ORACLE_API_KEY: ${ORACLE_API_KEY}
+      ORACLE_TIMEOUT_SECS: "10"
+      GATEWAY_ORACLE_HEALTH_CHECK: "true"
+      GATEWAY_TEST_API_KEY: ${GATEWAY_TEST_API_KEY:?GATEWAY_TEST_API_KEY requerida}
+      GATEWAY_DEFAULT_MERCHANT_ID: ${GATEWAY_DEFAULT_MERCHANT_ID:-550e8400-e29b-41d4-a716-446655440000}
+      GATEWAY_DEFAULT_FUNDING_TYPE: traditional_bank
+      GATEWAY_RAIL_FALLBACK_ENABLED: "true"
+      GATEWAY_CORS_ORIGINS: ${GATEWAY_CORS_ORIGINS:-}
+      RUST_LOG: ${RUST_LOG:-api_gateway=info,tower_http=info}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 40s
+      retries: 8
+
+  caddy:
+    build:
+      context: ../..
+      dockerfile: deploy/staging/Dockerfile.caddy
+      args:
+        VITE_API_BASE_URL: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL requerida}
+        VITE_GATEWAY_API_KEY: ${GATEWAY_TEST_API_KEY}
+    restart: unless-stopped
+    depends_on:
+      gateway:
+        condition: service_healthy
+    networks:
+      - backend
+    environment:
+      STAGING_DOMAIN: ${STAGING_DOMAIN:?STAGING_DOMAIN requerida}
+      ACME_EMAIL: ${ACME_EMAIL:-ops@example.com}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    profiles:
+      - tls
+      - local
+    ports:
+      - "${CADDY_HTTP_PORT:-80}:80"
+      - "${CADDY_HTTPS_PORT:-443}:443"
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

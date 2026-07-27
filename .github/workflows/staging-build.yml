@@ -1,0 +1,89 @@
+# Fase 7 — validación de build Docker (staging)
+# No despliega al VPS; solo comprueba que las imágenes compilan.
+
+name: Staging Build
+
+on:
+  push:
+    branches: [main, master, liquidacion]
+    paths:
+      - 'deploy/staging/**'
+      - 'crates/**'
+      - 'oracle/**'
+      - 'antifraud/**'
+      - 'binance-sim/**'
+      - 'frontend/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.dockerignore'
+  pull_request:
+    branches: [main, master, liquidacion]
+    paths:
+      - 'deploy/staging/**'
+      - 'crates/**'
+      - 'oracle/**'
+      - 'antifraud/**'
+      - 'binance-sim/**'
+      - 'frontend/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.dockerignore'
+  workflow_dispatch:
+
+concurrency:
+  group: staging-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-build:
+    name: Build staging images
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Gateway image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/staging/Dockerfile.rust
+          push: false
+          tags: pasarela/gateway:ci
+          build-args: |
+            PACKAGE=api-gateway
+            BINARY=api-gateway
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Oracle image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/staging/Dockerfile.rust
+          push: false
+          tags: pasarela/oracle:ci
+          build-args: |
+            PACKAGE=oracle-authorization
+            BINARY=oracle-authorization
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Caddy + frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/staging/Dockerfile.caddy
+          push: false
+          tags: pasarela/caddy:ci
+          build-args: |
+            VITE_API_BASE_URL=https://staging.example.com
+            VITE_GATEWAY_API_KEY=sk_test_ci_build_placeholder
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Staging build gate OK
+        run: echo "Imágenes staging compiladas — ver deploy/staging/ y Doc/Runbook-Staging.md"

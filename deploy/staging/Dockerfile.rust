@@ -1,0 +1,38 @@
+# Imagen multi-stage para servicios Rust del monorepo (Fase 7).
+# Build: docker build -f deploy/staging/Dockerfile.rust --build-arg PACKAGE=api-gateway --build-arg BINARY=api-gateway .
+
+FROM rust:1-bookworm AS builder
+
+ARG PACKAGE
+ARG BINARY
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+COPY oracle ./oracle
+COPY antifraud ./antifraud
+COPY binance-sim ./binance-sim
+
+RUN cargo build --release -p "${PACKAGE}"
+
+FROM debian:bookworm-slim AS runtime
+
+ARG BINARY
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder "/app/target/release/${BINARY}" /usr/local/bin/service
+
+ENV RUST_LOG=info
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
+    CMD curl -sf "http://127.0.0.1:${SERVICE_PORT:-8080}/health" || exit 1
+
+ENTRYPOINT ["/usr/local/bin/service"]

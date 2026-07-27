@@ -12,17 +12,37 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::http::{HeaderName, Method};
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{AllowOrigin, CorsLayer};
 
 use crate::logging::http_trace_layer;
 use crate::state::AppState;
 
-fn dev_cors_layer() -> CorsLayer {
+fn cors_layer() -> CorsLayer {
+    let mut origins = vec![
+        "http://127.0.0.1:5173"
+            .parse()
+            .expect("origin dev 127.0.0.1"),
+        "http://localhost:5173"
+            .parse()
+            .expect("origin dev localhost"),
+    ];
+
+    if let Ok(raw) = std::env::var("GATEWAY_CORS_ORIGINS") {
+        for part in raw.split(',') {
+            let trimmed = part.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if let Ok(origin) = trimmed.parse() {
+                origins.push(origin);
+            } else {
+                tracing::warn!(origin = trimmed, "GATEWAY_CORS_ORIGINS: origen inválido, omitido");
+            }
+        }
+    }
+
     CorsLayer::new()
-        .allow_origin([
-            "http://127.0.0.1:5173".parse().expect("origin"),
-            "http://localhost:5173".parse().expect("origin"),
-        ])
+        .allow_origin(AllowOrigin::list(origins))
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers([
             HeaderName::from_static("authorization"),
@@ -40,6 +60,6 @@ fn dev_cors_layer() -> CorsLayer {
 /// Router Axum listo para `axum::serve`.
 pub fn build_app(state: AppState) -> Router {
     routes::create_router(Arc::new(state))
-        .layer(dev_cors_layer())
+        .layer(cors_layer())
         .layer(http_trace_layer())
 }
