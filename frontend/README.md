@@ -23,6 +23,8 @@ cp .env.example .env.local
 | `VITE_API_BASE_URL` | URL del Gateway (default `http://127.0.0.1:8080`) |
 | `VITE_GATEWAY_API_KEY` | Debe coincidir con `GATEWAY_TEST_API_KEY` en `crates/api-gateway/.env` |
 
+> El checkout en navegador requiere **CORS** en el Gateway (orígenes Vite `:5173`). Ver [Doc/Pruebas.md](../Doc/Pruebas.md).
+
 ## Desarrollo
 
 ```bash
@@ -43,12 +45,12 @@ pnpm dev          # http://localhost:5173
 
 ```bash
 pnpm test         # watch mode
-pnpm test:run     # CI — 77 tests
+pnpm test:run     # CI — 78 tests (incl. contrato fixture)
 pnpm lint
 pnpm build
 ```
 
-E2E Playwright (Fase 6): ver [tests/e2e/README.md](../tests/e2e/README.md).
+E2E Playwright (Fase 6): [tests/e2e/README.md](../tests/e2e/README.md) · Guía general: [Doc/Pruebas.md](../Doc/Pruebas.md)
 
 ## Estructura
 

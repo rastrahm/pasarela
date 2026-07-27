@@ -12,8 +12,8 @@
 | **Objetivo** | Procesador de pagos con tarjeta y liquidación mutable en tres rieles (Banco, Binance CEX, Solana) |
 | **Enfoque** | Desarrollo secuencial por fases; confirmación explícita antes de avanzar |
 | **Unidades de despliegue** | `pasarela/` + `oracle/` + `antifraud/` (monorepo D5) |
-| **Fase actual** | **Fase 6 — Integración, QA y hardening** |
-| **Última fase cerrada** | **Fase 5 — Frontend** *(2026-07-26 — [Acta](./Acta-Cierre-Fase-5.md))* |
+| **Fase actual** | **Fase 7 — Staging** |
+| **Última fase cerrada** | **Fase 6 — Integración, QA y hardening** *(gate local verificado 2026-07-26)* |
 
 ### Estado actual del repositorio
 
@@ -25,6 +25,7 @@
 | Workspace `pasarela/` (crates, programs, frontend) | ✅ Backend + `programs/payment-settlement/` devnet + **`frontend/`** checkout React |
 | CI/CD | ✅ `ci.yml` (Rust + frontend + Playwright) · ✅ `programs-anchor-test.yml` |
 | Despliegue producción | ⬜ Pendiente |
+| Staging (Docker Compose) | ✅ Artefactos + validación local/devnet (2026-07-27) |
 
 ---
 
@@ -355,7 +356,7 @@ Validar el sistema completo, cerrar brechas de seguridad del MVP y preparar arte
 
 | # | Paso | Detalle |
 |---|------|---------|
-| 6.1 | Tests E2E con Playwright | Flujo checkout completo por cada riel | 🔄 UI en CI; stack real manual |
+| 6.1 | Tests E2E con Playwright | Flujo checkout completo por cada riel | ✅ 6/6 local ([Pruebas.md](./Pruebas.md)); CI: UI only |
 | 6.2 | Tests cross-service | Gateway + Oracle real en procesos locales | ✅ `cross_service_integration.rs` |
 | 6.3 | Checklist QA por caso de uso | UC-01 a UC-11 ([Checklist-QA-Fase-6.md](./Checklist-QA-Fase-6.md)) | ✅ Documentado |
 | 6.4 | Revisión de seguridad | OWASP, PCI simulado, frontera Oracle (§9 Arquitectura) | ✅ [Revision-Seguridad-Fase-6.md](./Revision-Seguridad-Fase-6.md) |
@@ -377,7 +378,7 @@ Validar el sistema completo, cerrar brechas de seguridad del MVP y preparar arte
 
 ### Criterios de aceptación (gate)
 
-- [ ] Playwright E2E verde en los 3 rieles
+- [x] Playwright E2E verde en los 3 rieles — verificado local 2026-07-26 ([Pruebas.md](./Pruebas.md))
 - [ ] Stack local levantable según runbook (sin contenedores)
 - [ ] CI verde en rama principal — ver [`Doc/CI.md`](./CI.md) y [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)
 - [ ] Checklist QA firmado / aprobado — ver [Checklist-QA-Fase-6.md §16](./Checklist-QA-Fase-6.md#16-aprobación-gate-fase-6)
@@ -387,6 +388,15 @@ Validar el sistema completo, cerrar brechas de seguridad del MVP y preparar arte
 
 ## 11. Fase 7 — Staging (pre-producción)
 
+**Estado:** 🔄 En curso (2026-07-27) — Bloque 2–3: local + devnet validados; VPS pendiente.
+
+| Bloque | Alcance | Estado |
+|--------|---------|--------|
+| **1** | Compose, Dockerfiles, Caddy TLS, `.env.example`, smoke, runbook | ✅ Entregado en repo |
+| **2** | Deploy VPS real, TLS Let's Encrypt, secretos en servidor | ✅ Scripts + workflow; deploy en VPS ⬜ |
+| **3** | Smoke 3 rieles en staging, Oracle no expuesto | ✅ Local + devnet · VPS ⬜ |
+| **4** | Logs centralizados, alertas, carga ligera (7.9–7.12) | ⬜ Pendiente |
+
 ### Objetivo
 
 Desplegar en un entorno idéntico a producción para pruebas finales con datos simulados y monitoreo.
@@ -395,17 +405,17 @@ Desplegar en un entorno idéntico a producción para pruebas finales con datos s
 
 | # | Paso | Detalle |
 |---|------|---------|
-| 7.1 | Provisionar infraestructura staging | VPS / cloud / k8s según decisión |
-| 7.2 | Configurar red privada | Oracle **sin** exposición pública |
-| 7.3 | TLS en Gateway y Frontend | Certificados (Let's Encrypt / ACM) |
-| 7.4 | Secretos en gestor seguro | No `.env` plano en servidor; Vault / AWS SM |
-| 7.5 | Desplegar Oracle | Proceso en red interna; allowlist IP del Gateway |
-| 7.6 | Desplegar Gateway | Binario/servicio público; env `ORACLE_BASE_URL` interno |
-| 7.7 | Desplegar Frontend | CDN o hosting estático detrás de TLS |
+| 7.1 | Provisionar infraestructura staging | ✅ `provision-vps.sh` + [Provision-VPS-Fase-7.md](./Provision-VPS-Fase-7.md) |
+| 7.2 | Configurar red privada | Oracle **sin** exposición pública — ✅ en `docker-compose.yml` |
+| 7.3 | TLS en Gateway y Frontend | ✅ Caddy + `Dockerfile.caddy` |
+| 7.4 | Secretos en gestor seguro | ✅ `generate-staging-secrets.sh`; Vault/SM en Fase 8 |
+| 7.5 | Desplegar Oracle | ✅ imagen Rust; red `backend` interna |
+| 7.6 | Desplegar Gateway | ✅ imagen Rust; proxy Caddy `/api` |
+| 7.7 | Desplegar Frontend | ✅ build Vite embebido en Caddy |
 | 7.8 | Solana devnet (staging) | Programa desplegado; RPC dedicado recomendado |
 | 7.9 | Configurar logs centralizados | Agregación sin PII |
-| 7.10 | Configurar healthchecks y alertas | `/health` Oracle + Gateway |
-| 7.11 | Smoke tests en staging | Script automatizado post-deploy |
+| 7.10 | Configurar healthchecks y alertas | ✅ healthchecks Compose; alertas ⬜ |
+| 7.11 | Smoke tests en staging | ✅ `scripts/smoke-staging.sh` |
 | 7.12 | Prueba de carga ligera | Verificar rate limits y timeouts |
 
 ### Topología staging
@@ -599,13 +609,18 @@ Cada transición requiere **confirmación explícita** (según Contexto General)
 
 | Documento | Uso |
 |-----------|-----|
+| [`README.md`](../README.md) | Entrada al proyecto, componentes, inicio rápido |
 | [Arquitectura.md](./Arquitectura.md) | Componentes, seguridad, fases técnicas |
 | [Casos-de-Uso-ER-Flujos.md](./Casos-de-Uso-ER-Flujos.md) | UC, ER, flujos para QA |
 | [Contexto General.md](./Contexto%20General.md) | Prompt maestro y regla de confirmación |
 | `oracle/README.md` | Operación del servicio Oracle |
 | `crates/api-gateway/README.md` | Operación del Gateway, curl/Postman |
 | [Doc/CI.md](./CI.md) | Pipelines GitHub Actions (Fase 6.6) |
+| [Pruebas.md](./Pruebas.md) | Guía unificada de testing (Fase 6) |
 | [Runbook-Desarrollo.md](./Runbook-Desarrollo.md) | Stack local sin contenedores (Fase 6.7) |
+| [Runbook-Staging.md](./Runbook-Staging.md) | Deploy Docker + Caddy staging (Fase 7) |
+| [Provision-VPS-Fase-7.md](./Provision-VPS-Fase-7.md) | Checklist provision VPS + primer deploy (Fase 7.2) |
+| [Publicacion-LinkedIn.md](./Publicacion-LinkedIn.md) | Borrador post LinkedIn para release del repo |
 | [Revision-Rendimiento-Fase-6.md](./Revision-Rendimiento-Fase-6.md) | Rendimiento checkout Fase 6.5 |
 | [Revision-Seguridad-Fase-6.md](./Revision-Seguridad-Fase-6.md) | Revisión OWASP/PCI Fase 6.4 |
 | [Checklist-QA-Fase-6.md](./Checklist-QA-Fase-6.md) | QA UC-01–UC-11 (Fase 6.3) |
@@ -622,4 +637,5 @@ Cada transición requiere **confirmación explícita** (según Contexto General)
 
 1. ~~**Cerrar Fase 0**~~ ✅ Ver [Acta-Cierre-Fase-0.md](./Acta-Cierre-Fase-0.md).
 2. ~~**Fases 1–5**~~ ✅ Dominio, Oracle, Solana, Gateway, Frontend — ver actas de cierre.
-3. **Fase 6 — gate final**: pasos 6.1–6.8 completados; pendiente E2E 3 rieles, QA firmado, CI en GitHub, confirmación Fase 7.
+3. ~~**Fase 6 — gate local**~~ ✅ E2E 3 rieles verificado local ([Pruebas.md](./Pruebas.md)).
+4. **Fase 7 — Bloque 2–3 local** ✅ stack native, frontend, smoke 3 rieles + devnet; **siguiente**: VPS ([Provision-VPS-Fase-7.md](./Provision-VPS-Fase-7.md)), publicación repo ([README.md](../README.md)).

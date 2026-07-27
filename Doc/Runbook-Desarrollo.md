@@ -229,7 +229,7 @@ Ver [tests/e2e/README.md](../tests/e2e/README.md).
 |------|-------------------|-------|
 | `traditional_bank` | PG + antifraud + oracle + gateway + frontend | Saldo desde `TRADITIONAL_BANK_BALANCE` |
 | `binance_cex` | + binance-sim | Saldo vía `GET /internal/v1/spot/balance` |
-| `solana_wallet` | + RPC Solana accesible | Sin RPC → Oracle `503 RAIL_UNAVAILABLE` |
+| `solana_wallet` | + RPC Solana accesible + pubkey/mint válidos | Ver [§8 Anexo Solana](#8-anexo--solana-local-para-e2e) |
 
 Tarjeta de prueba (Luhn válido): `4111111111111111`, expiry `12/2030`, CVV `123`.
 
@@ -256,11 +256,18 @@ curl -sf http://127.0.0.1:8080/health && echo " gateway OK"
 export GATEWAY=http://127.0.0.1:8080
 export API_KEY=sk_test_change_me_32chars_min   # tu GATEWAY_TEST_API_KEY
 
-curl -s -X POST "$GATEWAY/api/v1/checkout" \
-  -H "Authorization: Bearer $API_KEY" \
-  -H "Idempotency-Key: runbook-$(date +%s)" \
-  -H "Content-Type: application/json" \
-  -d @scripts/fixtures/checkout-bank.json | jq
+# 3. Checkout curl — 3 rieles
+for f in checkout-bank.json checkout-binance.json checkout-solana.json; do
+  echo "=== $f ==="
+  curl -s -X POST "$GATEWAY/api/v1/checkout" \
+    -H "Authorization: Bearer $API_KEY" \
+    -H "Idempotency-Key: runbook-$(date +%s)-$RANDOM" \
+    -H "Content-Type: application/json" \
+    -d @scripts/fixtures/$f | jq
+done
+
+# 4. Playwright E2E (6 tests — requiere stack + CORS)
+cd tests/e2e && pnpm test
 ```
 
 ### UI
@@ -282,8 +289,10 @@ curl -s -X POST "$GATEWAY/api/v1/checkout" \
 | Checkout 401 | API key frontend ≠ Gateway | Sincronizar `VITE_GATEWAY_API_KEY` |
 | Checkout 503 antifraude | antifraud no corre | Terminal 2 — `cd antifraud && cargo run` |
 | Riel Binance 503 | binance-sim caído o API key distinta | Levantar binance-sim; revisar `BINANCE_CEX_API_KEY` |
-| Riel Solana 503 | RPC inaccesible | `solana-test-validator` o cambiar a devnet |
-| Playwright skip stack real | Gateway no responde | Completar §3 antes de `pnpm test` |
+| Riel Solana 503 | RPC caído o pubkey inválido | §8 Anexo Solana |
+| Riel Solana 402 | Sin saldo SPL local | Mint tokens §8 |
+| Playwright: *Sin conexión al Gateway* en UI | CORS o Gateway caído | CORS dev en Gateway; `:8080/health` |
+| Playwright skip stack real | Gateway no responde | Completar §3; `./scripts/check-env.sh --live` |
 | Puerto en uso | Servicio duplicado | `ss -tlnp \| grep 808` y detener proceso |
 
 ### Logs útiles
@@ -314,6 +323,39 @@ cargo test -p api-gateway --test cross_service_integration -- --test-threads=1
 
 ---
 
+## 8. Anexo — Solana local para E2E
+
+El placeholder `DemoWallet1111111111111111111111111111111` **no es válido** para JSON-RPC. Para checkout `solana_wallet` en localnet:
+
+```bash
+# 1. Validador
+solana-test-validator --quiet --reset
+
+# 2. Wallet de prueba
+solana-keygen new --no-bip39-passphrase -o /tmp/pasarela-test-wallet.json --force
+PUBKEY=$(solana-keygen pubkey /tmp/pasarela-test-wallet.json)
+
+# 3. Mint SPL + saldo
+solana config set --url http://127.0.0.1:8899
+solana airdrop 2 "$PUBKEY"
+MINT=$(spl-token create-token --decimals 6 2>&1 | awk '/Creating token/{print $3}')
+spl-token create-account "$MINT" --owner /tmp/pasarela-test-wallet.json
+ATA=$(spl-token accounts --owner "$PUBKEY" | awk 'NR==3{print $1}')
+spl-token mint "$MINT" 10000 "$ATA"
+```
+
+Actualizar `oracle/.env`:
+
+```
+SOLANA_RPC_URL=http://127.0.0.1:8899
+SOLANA_WALLET_PUBKEY=<PUBKEY>
+SOLANA_TOKEN_MINT=<MINT>
+```
+
+Reiniciar Oracle. Verificación: [Doc/Pruebas.md §3](./Pruebas.md#3-regresión-con-stack-local).
+
+---
+
 ## 9. Referencias
 
 | Documento | Contenido |
@@ -322,6 +364,7 @@ cargo test -p api-gateway --test cross_service_integration -- --test-threads=1
 | [CI.md](./CI.md) | Pipeline GitHub Actions |
 | [Checklist-QA-Fase-6.md](./Checklist-QA-Fase-6.md) | QA UC-01–UC-11 |
 | [Deuda-Tecnica.md §5](./Deuda-Tecnica.md#5-configuración-y-entorno) | Variables compartidas |
+| [Pruebas.md](./Pruebas.md) | Guía unificada de testing (Fase 6) |
 | [tests/e2e/README.md](../tests/e2e/README.md) | Playwright E2E |
 | `oracle/README.md` | Detalle Oracle y tests |
 | `crates/api-gateway/README.md` | curl checkout |

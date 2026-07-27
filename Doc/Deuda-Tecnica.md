@@ -269,6 +269,7 @@
 
 | Fecha | Cambio |
 |-------|--------|
+| 2026-07-26 | E2E Playwright 6/6 verificado local — [Pruebas.md](./Pruebas.md); CORS Gateway; runbook §8 Solana |
 | 2026-07-26 | Fase 6.8 — [Cierre-Deuda-Fase-6.8.md](./Cierre-Deuda-Fase-6.8.md); fixtures canónicos; mocks consolidados |
 | 2026-07-26 | Runbook 6.7 — [Runbook-Desarrollo.md](./Runbook-Desarrollo.md) + `scripts/check-env.sh` |
 | 2026-07-26 | CI unificado 6.6 — `.github/workflows/ci.yml` + [Doc/CI.md](./CI.md) |
@@ -279,6 +280,7 @@
 
 ## Referencias
 
+- [Doc/Pruebas.md](./Pruebas.md)
 - [Plan-de-Implementacion.md §10](./Plan-de-Implementacion.md#10-fase-6--integración-qa-y-hardening)
 - [Arquitectura.md §4](./Arquitectura.md#4-reglas-de-dependencia)
 - [Acta-Cierre-Fase-5.md](./Acta-Cierre-Fase-5.md)

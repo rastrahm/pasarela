@@ -1,0 +1,27 @@
+# Caddy — same-origin: frontend estático + proxy /api y /health → Gateway.
+# Variables (desde .env del host): STAGING_DOMAIN, ACME_EMAIL
+#
+# STAGING_DOMAIN=staging.example.com  → TLS automático (Let's Encrypt)
+# STAGING_DOMAIN=:80                  → HTTP local (perfil `local`)
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$STAGING_DOMAIN} {
+	root * /srv/frontend
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy gateway:8080
+	}
+
+	handle /health {
+		reverse_proxy gateway:8080
+	}
+
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}

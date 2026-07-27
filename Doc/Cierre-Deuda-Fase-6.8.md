@@ -93,7 +93,7 @@ cd frontend && pnpm test:run src/schemas/gateway.test.ts
 
 ## 7. Gate Fase 6 — pendiente (fuera de 6.8)
 
-- [ ] Playwright E2E verde en 3 rieles con stack real
+- [x] Playwright E2E verde en 3 rieles con stack real — local 2026-07-26 ([Pruebas.md](./Pruebas.md))
 - [ ] Checklist QA firmado ([Checklist-QA-Fase-6.md §16](./Checklist-QA-Fase-6.md#16-aprobación-gate-fase-6))
 - [ ] CI verde en rama principal (push GitHub)
 - [ ] Confirmación explícita para Fase 7
