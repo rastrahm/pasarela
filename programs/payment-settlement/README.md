@@ -2,40 +2,82 @@
 >
 # payment-settlement (Anchor)
 
-Programa Solana del riel **SolanaWallet** — transferencia SPL atómica y evento `PaymentProcessed` sin PII.
+Programa Solana del riel **SolanaWallet** — **Fase 3** (liquidación SPL on-chain).
 
-> Fase 3 del [Plan de Implementación](../../Doc/Plan-de-Implementacion.md).  
+> Transferencia atómica de tokens SPL al comercio, PDA acumuladora por merchant y evento `PaymentProcessed` **sin PII** (D6 / UC-07).  
 > Directivas: [`solana.cursorrules`](../../solana.cursorrules)
+
+## Responsabilidad
+
+| Aspecto | Detalle |
+|---------|---------|
+| Riel | `SolanaWallet` (`FundingType` en dominio) |
+| Instrucción principal | `process_payment` — debita SPL del pagador, acredita al comercio |
+| Estado on-chain | PDA `SettlementState` por comercio (contadores acumulados) |
+| Auditoría | Evento `PaymentProcessed { amount, brand_code, settlement_rail_id, timestamp }` |
+| Fuera de alcance | Autorización off-chain, holds, antifraude — Oracle + Gateway |
+
+## Instrucciones on-chain
+
+| Instrucción | Uso |
+|-------------|-----|
+| `initialize` | Smoke post-deploy (no-op) |
+| `initialize_settlement` | Crea PDA `SettlementState` para un merchant |
+| `process_payment` | Transferencia SPL + actualización de contadores + evento |
+| `set_settlement_totals` | **Solo tests** — ajuste de contadores TDD |
+| `initialize_settlement_undersized` | **Solo tests** — fixture de espacio insuficiente |
+
+## PDA `SettlementState`
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `merchant` | Pubkey | Comercio (seed) |
+| `total_amount` | u64 | Suma liquidada (base units SPL) |
+| `payment_count` | u64 | Pagos exitosos |
+| `bump` | u8 | Bump canonical |
+
+Seeds: `["settlement", merchant.as_ref()]`. Tests: `tests/settlement-state.ts`.
+
+## Integración
+
+| Componente | Rol |
+|------------|-----|
+| [`settlement-adapters`](../../crates/settlement-adapters/) | `SolanaWalletAdapter` construye y envía la tx `process_payment` |
+| [`api-gateway`](../../crates/api-gateway/) | Orquesta checkout; usa el adapter vía `SettlementEngine` |
+| Oracle | **No** invoca el programa — solo evalúa saldo SPL off-chain |
+
+Program ID (localnet + devnet): `4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564B`
 
 ## Requisitos
 
 - Anchor CLI `0.31.1` (`avm install 0.31.1 && avm use 0.31.1`)
 - Solana CLI ≥ 2.x
-- **Platform-tools `v1.52`** (rustc 1.89) — el default de Solana 2.2.x (`v1.48`, rustc 1.84) no compila el lockfile actual por crates con `edition2024`
+- **Platform-tools `v1.52`** (rustc 1.89) — el default de Solana 2.2.x (`v1.48`) no compila el lockfile actual
 - Node.js 18+ + `npm`
 
 ### Toolchain Solana (importante)
-
-Solana CLI 2.2.20 trae `platform-tools v1.48` (rustc 1.84). Para compilar:
 
 ```bash
 # Descarga v1.52 en ~/.cache/solana/ (automático la primera vez)
 cargo build-sbf --tools-version v1.52 --manifest-path programs/payment-settlement/Cargo.toml
 ```
 
-El workspace declara `[workspace.metadata.solana] tools-version = "v1.52"` en `Cargo.toml` (requiere Agave ≥ 3.x para que `anchor build` lo respete automáticamente). Con Solana 2.2.x usar el script `npm run build`.
+El workspace declara `tools-version = "v1.52"` en `Cargo.toml`. Con Solana 2.2.x usar `npm run build`.
 
 ## Estructura
 
 ```
 programs/payment-settlement/
 ├── Anchor.toml
-├── Cargo.toml                 # workspace Rust del programa
-├── package.json               # tests TypeScript (Mocha + ts-mocha)
-├── programs/payment-settlement/
-│   └── src/lib.rs             # instrucciones on-chain
-├── tests/payment-settlement.ts
-└── migrations/
+├── Cargo.toml
+├── package.json
+├── programs/payment-settlement/src/
+│   ├── lib.rs              # instrucciones
+│   ├── state.rs            # SettlementState, PaymentProcessed
+│   └── constraints.rs      # validaciones PDA
+├── tests/                  # Mocha + ts-mocha (17 tests)
+├── deploy/devnet.json      # metadatos deploy devnet
+└── scripts/ci-test.sh
 ```
 
 ## Comandos
@@ -44,11 +86,24 @@ programs/payment-settlement/
 cd programs/payment-settlement
 npm install
 npm test                 # build + anchor test (17 tests, validador local)
-npm run test:ci          # gate 3.8 + 3.10 (scripts/ci-test.sh)
-npm run lint:docs        # verifica @notice/@param/@return en instrucciones
+npm run test:ci          # gate CI (scripts/ci-test.sh)
+npm run lint:docs        # @notice/@param/@return en instrucciones
+npm run deploy:devnet    # build + anchor deploy --provider.cluster devnet
+npm run verify:devnet    # solana program show contra devnet
 ```
 
-### CI (gate 3.8)
+Variables: [`.env.example`](.env.example) (`SOLANA_RPC_URL`, `PAYMENT_SETTLEMENT_PROGRAM_ID`).
+
+## Clusters (D2)
+
+| Entorno | Uso | RPC |
+|---------|-----|-----|
+| `localnet` | Desarrollo y `anchor test` | `http://127.0.0.1:8899` |
+| `devnet` | Staging / integración Gateway | `https://api.devnet.solana.com` |
+
+Devnet desplegado **2026-07-25** — metadatos en [`deploy/devnet.json`](deploy/devnet.json).
+
+## CI
 
 Workflow: [`.github/workflows/programs-anchor-test.yml`](../../.github/workflows/programs-anchor-test.yml)
 
@@ -56,59 +111,25 @@ Workflow: [`.github/workflows/programs-anchor-test.yml`](../../.github/workflows
 |---------|-----|
 | PR / push (`programs/payment-settlement/**`) | Solana 2.2.20 + Anchor 0.31.1 + platform-tools v1.52 + `anchor test` |
 
-Reproducir localmente el mismo gate:
-
-```bash
-./scripts/ci-test.sh
-```
-
-## Clusters (D2)
-
-| Entorno | Uso | RPC |
-|---------|-----|-----|
-| `localnet` | Desarrollo y `anchor test` | `http://127.0.0.1:8899` |
-| `devnet` | Staging / integración Gateway (3.9) | `https://api.devnet.solana.com` |
-
-Program ID (localnet + devnet): `4cKoeammHN8UjAbiJRw2DqxBPL1Mb1EaPQeJFFuo564B`
-
-### Devnet (paso 3.9)
-
-Desplegado el **2026-07-25**. Metadatos en [`deploy/devnet.json`](deploy/devnet.json).
-
-```bash
-npm run deploy:devnet    # build + anchor deploy --provider.cluster devnet
-npm run verify:devnet    # solana program show contra devnet
-```
-
-Variables de entorno: [`.env.example`](.env.example) (`SOLANA_RPC_URL`, `PAYMENT_SETTLEMENT_PROGRAM_ID`).
-
-## Próximos pasos (Plan §7)
-
-### Estado tests (3.8)
-
-`npm test` / `anchor test --skip-build` — **17/17 verdes** en validador local.
+## Estado (Plan §7)
 
 | Paso | Entregable |
 |------|------------|
+| 3.8 | ✅ 17/17 tests verdes en validador local |
 | 3.9 | ✅ Devnet — `deploy/devnet.json` |
-| 3.10 | ✅ `@notice/@param/@return` — gate `npm run lint:docs` |
-| Gate Fase 3 | Acta de cierre pendiente; gate técnico Anchor ✅ |
+| 3.10 | ✅ Documentación instrucciones — `npm run lint:docs` |
 | Gate Fase 4 | [Acta-Cierre-Fase-4.md](../../Doc/Acta-Cierre-Fase-4.md) (2026-07-26) |
-
-### PDA `SettlementState` (3.3)
-
-| Campo | Tipo | Descripción |
-|-------|------|-------------|
-| `merchant` | Pubkey | Comercio (seed) |
-| `total_amount` | u64 | Suma liquidada |
-| `payment_count` | u64 | Pagos exitosos |
-| `bump` | u8 | Bump canonical |
-
-Seeds: `["settlement", merchant.as_ref()]`. Tests: `tests/settlement-state.ts`.
 
 ## Seguridad
 
-- Zero PII on-chain (D6 / UC-07)
-- `checked_add` / `checked_sub` para overflow
-- Constraints explícitos en `#[derive(Accounts)]`
-- Commitment `finalized` en Gateway (D10) — fuera de este crate
+- Zero PII on-chain (D6 / UC-07) — solo `brand_code` numérico, no PAN
+- `checked_add` en contadores PDA (`AmountOverflow`)
+- Constraints explícitos en `ProcessPayment` (owner, mint, saldo, espacio PDA)
+- Commitment `finalized` en Gateway (D10) — fuera de este programa
+
+## Referencias
+
+- [Doc/Arquitectura.md](../../Doc/Arquitectura.md) — §7 on-chain, D2, D6, D10
+- [Doc/Casos-de-Uso-ER-Flujos.md](../../Doc/Casos-de-Uso-ER-Flujos.md) — UC-07
+- [Doc/Plan-de-Implementacion.md](../../Doc/Plan-de-Implementacion.md) — Fase 3
+- [settlement-adapters/README.md](../../crates/settlement-adapters/README.md) — adapter Solana

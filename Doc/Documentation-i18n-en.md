@@ -46,6 +46,8 @@ Each document exists in three forms:
 |---------|----|----|
 | Root | [README-es.md](../README-es.md) | [README-en.md](../README-en.md) |
 | API Gateway | [api-gateway/README-es.md](../crates/api-gateway/README-es.md) | [api-gateway/README-en.md](../crates/api-gateway/README-en.md) |
+| Domain | [domain/README-es.md](../crates/domain/README-es.md) | [domain/README-en.md](../crates/domain/README-en.md) |
+| Rail Switcher | [rail-switcher/README-es.md](../crates/rail-switcher/README-es.md) | [rail-switcher/README-en.md](../crates/rail-switcher/README-en.md) |
 | Oracle | [oracle/README-es.md](../oracle/README-es.md) | [oracle/README-en.md](../oracle/README-en.md) |
 | Antifraud | [antifraud/README-es.md](../antifraud/README-es.md) | [antifraud/README-en.md](../antifraud/README-en.md) |
 | Binance sim | [binance-sim/README-es.md](../binance-sim/README-es.md) | [binance-sim/README-en.md](../binance-sim/README-en.md) |
