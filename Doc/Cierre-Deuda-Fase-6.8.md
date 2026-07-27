@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Cierre-Deuda-Fase-6.8-es.md) · [English (en)](Cierre-Deuda-Fase-6.8-en.md)
+>
 # Cierre deuda técnica — Fase 6.8
 
 > **Fecha:** 2026-07-26  

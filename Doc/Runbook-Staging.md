@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Runbook-Staging-es.md) · [English (en)](Runbook-Staging-en.md)
+>
 # Runbook — Staging (Fase 7)
 
 > Entorno pre-producción: **1 VPS + Docker Compose + Caddy TLS**.  

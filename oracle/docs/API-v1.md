@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](API-v1-es.md) · [English (en)](API-v1-en.md)
+>
 # Oracle — Contrato API interna v1
 
 > Versión: **1.0.0** · Base path: `/internal/v1`  

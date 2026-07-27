@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Deuda-Tecnica-es.md) · [English (en)](Deuda-Tecnica-en.md)
+>
 # Deuda técnica — Pasarela Multi-Rail
 
 > Registro vivo de deuda identificada antes y durante **Fase 6 — Integración, QA y hardening**.  

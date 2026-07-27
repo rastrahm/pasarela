@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Acta-Cierre-Fase-0-es.md) · [English (en)](Acta-Cierre-Fase-0-en.md)
+>
 # Acta de Cierre — Fase 0 (Planificación)
 
 > Gate **0.8** · Validación y aprobación de documentación  

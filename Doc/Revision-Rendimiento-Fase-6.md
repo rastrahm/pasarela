@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Revision-Rendimiento-Fase-6-es.md) · [English (en)](Revision-Rendimiento-Fase-6-en.md)
+>
 # Revisión de rendimiento — Fase 6.5
 
 > Presupuesto checkout ~1–3 s · Cuellos de botella · Timeouts configurados  

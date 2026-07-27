@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](README-es.md) · [English (en)](README-en.md)
+>
 # E2E — Playwright (Fase 6.1)
 
 Tests de extremo a extremo del checkout React contra el **stack real** (Gateway + Oracle + simuladores).

@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](README-es.md) · [English (en)](README-en.md)
+>
 # oracle-client
 
 Cliente HTTP tipado hacia el **Oracle de Autorización** (contrato API v1).

@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](README-es.md) · [English (en)](README-en.md)
+>
 # Servicio Antifraude Simulado
 
 Microservicio independiente que evalúa scoring de riesgo antes del hold del Oracle (UC-12, D11).

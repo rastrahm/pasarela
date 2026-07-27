@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Runbook-Desarrollo-es.md) · [English (en)](Runbook-Desarrollo-en.md)
+>
 # Runbook de desarrollo — Pasarela Multi-Rail
 
 > Fase 6.7 · Stack local sin contenedores  

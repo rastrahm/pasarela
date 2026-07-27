@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](README-es.md) · [English (en)](README-en.md)
+>
 # frontend — Pasarela Multi-Rail Checkout
 
 Interfaz React del checkout multi-rail — **Fase 5 ✅** (acta: [Doc/Acta-Cierre-Fase-5.md](../Doc/Acta-Cierre-Fase-5.md)).

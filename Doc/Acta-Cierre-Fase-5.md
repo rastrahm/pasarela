@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Acta-Cierre-Fase-5-es.md) · [English (en)](Acta-Cierre-Fase-5-en.md)
+>
 # Acta de Cierre — Fase 5 (Frontend — Dashboard & Checkout)
 
 > Gate **5.11** · Verificación técnica y confirmación stakeholder  

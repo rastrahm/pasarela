@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Pruebas-es.md) · [English (en)](Pruebas-en.md)
+>
 # Pruebas — Pasarela Multi-Rail
 
 > Guía unificada de testing · Fase 6  

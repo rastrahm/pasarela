@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Casos-de-Uso-ER-Flujos-es.md) · [English (en)](Casos-de-Uso-ER-Flujos-en.md)
+>
 # Casos de Uso, Modelo Entidad-Relación y Flujos
 
 > Documento complementario de [Arquitectura.md](./Arquitectura.md). Describe el comportamiento funcional, el modelo de datos y los flujos operativos del sistema de pagos multi-rail.  

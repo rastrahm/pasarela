@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Publicacion-LinkedIn-es.md) · [English (en)](Publicacion-LinkedIn-en.md)
+>
 # Publicación LinkedIn — Pasarela Multi-Rail
 
 > Borrador listo para copiar/pegar. Ajustá enlaces al repo público cuando esté disponible.

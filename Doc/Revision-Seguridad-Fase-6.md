@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Revision-Seguridad-Fase-6-es.md) · [English (en)](Revision-Seguridad-Fase-6-en.md)
+>
 # Revisión de seguridad — Fase 6.4
 
 > OWASP Top 10 · PCI simulado · Frontera Oracle (Arquitectura §9)  
