@@ -133,7 +133,7 @@ Detalle paso a paso: [Doc/Runbook-Desarrollo.md](Doc/Runbook-Desarrollo.md) · [
 
 ### READMEs por servicio
 
-[`oracle/`](oracle/README.md) · [`crates/api-gateway/`](crates/api-gateway/README.md) · [`antifraud/`](antifraud/README.md) · [`binance-sim/`](binance-sim/README.md) · [`frontend/`](frontend/README.md) · [`programs/payment-settlement/`](programs/payment-settlement/README.md) · [`deploy/staging/`](deploy/staging/README.md)
+[`oracle/`](oracle/README.md) · [`crates/domain/`](crates/domain/README.md) · [`crates/rail-switcher/`](crates/rail-switcher/README.md) · [`crates/api-gateway/`](crates/api-gateway/README.md) · [`antifraud/`](antifraud/README.md) · [`binance-sim/`](binance-sim/README.md) · [`frontend/`](frontend/README.md) · [`programs/payment-settlement/`](programs/payment-settlement/README.md) · [`deploy/staging/`](deploy/staging/README.md)
 
 ---
 
