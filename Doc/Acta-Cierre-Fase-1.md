@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Acta-Cierre-Fase-1-es.md) · [English (en)](Acta-Cierre-Fase-1-en.md)
+>
 # Acta de Cierre — Fase 1 (Dominio y abstracción de rieles)
 
 > Gate **1.9** · Verificación técnica y cierre de dominio  

@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Arquitectura-es.md) · [English (en)](Arquitectura-en.md)
+>
 # Arquitectura del Sistema de Pagos Multi-Rail
 
 > Documento de referencia para el diseño e implementación del procesador de pagos agnóstico Web2/Web3 descrito en [Contexto General.md](./Contexto%20General.md).  

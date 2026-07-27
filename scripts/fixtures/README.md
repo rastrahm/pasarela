@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](README-es.md) · [English (en)](README-en.md)
+>
 # Fixtures canónicos — checkout API pública
 
 > Fase 6.8 · Resuelve [DT-P1-01](../Doc/Deuda-Tecnica.md#dt-p1-01--fixtures-json-divergentes-gateway--oracle--frontend)

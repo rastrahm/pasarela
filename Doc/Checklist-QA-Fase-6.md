@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Checklist-QA-Fase-6-es.md) · [English (en)](Checklist-QA-Fase-6-en.md)
+>
 # Checklist QA — Fase 6 (UC-01 a UC-11)
 
 > Verificación sistemática de casos de uso antes del gate Fase 6.  

@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](README-es.md) · [English (en)](README-en.md)
+>
 # api-gateway
 
 API Gateway y orquestador de checkout — **Fase 4 ✅** (acta: [Doc/Acta-Cierre-Fase-4.md](../../Doc/Acta-Cierre-Fase-4.md)).

@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Acta-Cierre-Fase-2-es.md) · [English (en)](Acta-Cierre-Fase-2-en.md)
+>
 # Acta de Cierre — Fase 2 (Oracle de autorización)
 
 > Gate **2.11** · Verificación técnica y confirmación stakeholder  

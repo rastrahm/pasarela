@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](README-es.md) · [English (en)](README-en.md)
+>
 # payment-settlement (Anchor)
 
 Programa Solana del riel **SolanaWallet** — transferencia SPL atómica y evento `PaymentProcessed` sin PII.

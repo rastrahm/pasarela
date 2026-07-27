@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](README-es.md) · [English (en)](README-en.md)
+>
 # settlement-adapters
 
 Adaptadores de liquidación por riel — **Strategy pattern** (Fase 4 ✅).

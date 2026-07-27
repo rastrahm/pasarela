@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](CI-es.md) · [English (en)](CI-en.md)
+>
 # CI — Pasarela Multi-Rail
 
 > Fase 6.6 · Workflows GitHub Actions

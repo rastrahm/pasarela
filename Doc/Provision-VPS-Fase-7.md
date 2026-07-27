@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Provision-VPS-Fase-7-es.md) · [English (en)](Provision-VPS-Fase-7-en.md)
+>
 # Provision VPS — Fase 7 Bloque 2
 
 > Checklist operativo para pasar de artefactos en repo a **staging real** en un VPS.

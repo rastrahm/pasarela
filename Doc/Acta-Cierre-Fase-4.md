@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Acta-Cierre-Fase-4-es.md) · [English (en)](Acta-Cierre-Fase-4-en.md)
+>
 # Acta de Cierre — Fase 4 (API Gateway y orquestación)
 
 > Gate **4.14** · Verificación técnica y confirmación stakeholder  

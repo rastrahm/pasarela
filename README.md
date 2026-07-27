@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](README-es.md) · [English (en)](README-en.md)
+>
 # Pasarela Multi-Rail
 
 Procesador de pagos con checkout unificado y liquidación intercambiable en **tres rieles**: banco tradicional, Binance CEX (simulado) y wallet Solana (SPL). Arquitectura de microservicios en Rust, programa Anchor on-chain y frontend React.
@@ -94,6 +96,8 @@ Detalle paso a paso: [Doc/Runbook-Desarrollo.md](Doc/Runbook-Desarrollo.md) · [
 
 ## Documentación
 
+> **Idiomas:** cada `.md` tiene variantes [`-es`](Doc/Documentation-i18n-es.md) y [`-en`](Doc/Documentation-i18n-en.md). Índice completo: [Doc/Documentation-i18n-es.md](Doc/Documentation-i18n-es.md) · [Doc/Documentation-i18n-en.md](Doc/Documentation-i18n-en.md).
+
 ### Diseño y planificación
 
 | Documento | Contenido |
@@ -129,7 +133,7 @@ Detalle paso a paso: [Doc/Runbook-Desarrollo.md](Doc/Runbook-Desarrollo.md) · [
 
 ### READMEs por servicio
 
-[`oracle/`](oracle/README.md) · [`crates/api-gateway/`](crates/api-gateway/README.md) · [`frontend/`](frontend/README.md) · [`programs/payment-settlement/`](programs/payment-settlement/README.md) · [`deploy/staging/`](deploy/staging/README.md)
+[`oracle/`](oracle/README.md) · [`crates/api-gateway/`](crates/api-gateway/README.md) · [`antifraud/`](antifraud/README.md) · [`binance-sim/`](binance-sim/README.md) · [`frontend/`](frontend/README.md) · [`programs/payment-settlement/`](programs/payment-settlement/README.md) · [`deploy/staging/`](deploy/staging/README.md)
 
 ---
 

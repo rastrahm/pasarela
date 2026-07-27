@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](README-es.md) · [English (en)](README-en.md)
+>
 # Oracle de Autorización
 
 Microservicio **independiente** de la pasarela. Simula la red procesadora (Visa/Mastercard), valida tarjetas y gestiona holds de fondos por riel.

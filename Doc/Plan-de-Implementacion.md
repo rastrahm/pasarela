@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](Plan-de-Implementacion-es.md) · [English (en)](Plan-de-Implementacion-en.md)
+>
 # Plan de Implementación — De Planificación a Producción
 
 > Hoja de ruta operativa del sistema de pagos multi-rail (Web2/Web3).  

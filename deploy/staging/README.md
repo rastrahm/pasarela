@@ -1,3 +1,5 @@
+> **Documentation / Documentación:** [Español (es)](README-es.md) · [English (en)](README-en.md)
+>
 # Staging — Docker Compose
 
 Stack completo para Fase 7: PostgreSQL, antifraude, binance-sim, Oracle (red interna), Gateway y Caddy (TLS + frontend).
